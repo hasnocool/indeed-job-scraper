@@ -107,14 +107,15 @@ The special ``.indeed-state/`` directory is no longer used; state root defaults 
 
 ### Cookie expiry model
 
-- **Expiry:** the earliest expiry among auth cookies (SESS, CTK, SUB, LV, LD,
-  UIMF, IRS, CSRF). When auth cookies are browser-session cookies, the expiry is
-  unknown and the session is used until Indeed rejects it.
+- **Expiry:** the earliest expiry among auth cookies (the Passport bearer and
+  refresh tokens, plus SESS, CTK, SUB, LV, LD, UIMF, IRS, CSRF). When auth
+  cookies are browser-session cookies, the expiry is unknown and the session is
+  used until Indeed rejects it.
 - **Rotation:** every save/refresh is appended to history.jsonl; rotated cookie
   names are listed on refresh events.
 - **Revocation:** an Indeed redirect to secure.indeed.com/auth marks the session
   revoked and triggers re-login (unless --no-relogin).
-- **Privacy:** the cookie list is a credential - keep .indeed-state/ private and
+- **Privacy:** the cookie list is a credential - keep data/cookies/ private and
   out of version control.
 
 ## CSV conversion
