@@ -70,8 +70,10 @@ def active_page(context: BrowserContext) -> Page:
 
 def seed_cookies(context: BrowserContext, session: CookieSession) -> bool:
     """Load saved cookies when the profile does not already hold a session."""
+    from .cookies import SESSION_COOKIE_NAMES
+
     names = {cookie["name"] for cookie in context.cookies()}
-    if "SESS" in names:
+    if names & SESSION_COOKIE_NAMES:
         return False
     if not session.cookies:
         return False
