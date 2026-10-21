@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Convert a scraper JSON dump into a CSV file.
 
-Defaults to the newest JSON in the state output directory; pass a path to
+Defaults to the newest JSON in the state runs directory; pass a path to
 convert a specific file. Handles both the structured format written today and
 the legacy list-of-Text-blocks format from the Selenium era.
 """
@@ -18,9 +18,13 @@ from indeed_scraper.export import load_jobs, records_to_csv
 def find_input() -> Path:
     if len(sys.argv) > 1:
         return Path(sys.argv[1])
-    output_dir = Config.load().output_dir
+    config = Config.load()
     candidates = sorted(
-        [*output_dir.glob("jobs_*.json"), *Path.cwd().glob("log_*.json")],
+        [
+            *config.runs_dir.glob("jobs_*.json"),
+            *config.latest_dir.glob("jobs_*.json"),
+            *Path.cwd().glob("log_*.json"),
+        ],
         key=lambda path: path.stat().st_mtime,
         reverse=True,
     )
