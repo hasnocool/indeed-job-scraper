@@ -56,7 +56,10 @@ The legacy entry point still works and forwards every flag to scrape:
 | status | Show the session, expiry and recent cookie history. |
 | cookies | Print the cookie list in use (--json for the raw list). |
 | doctor | Check Python, Playwright, Chromium, state dir and Indeed reachability. |
-| organize | Replay run files and refresh the deduped master dataset (no browser needed). |
+| organize | Replay the scrape history into the deduplicated master dataset. |
+| apply | Apply to postings from the master dataset (guarded, see below). |
+| resume | Resume an interrupted application from its saved draft. |
+| check-responses | Refresh the response status of every submitted application. |
 
 ## Search options
 
@@ -82,12 +85,9 @@ The legacy entry point still works and forwards every flag to scrape:
 A page that redirects to the sign-in wall stops the run with a clear
 "session no longer valid" error instead of returning partial results.
 
-## Data layout
+## Where things are stored
 
-Persistent data lives under ``data/``. The scrape history (``runs/``) and the
-organized master list (``master/``) are versioned so the mirror keeps a second
-copy; the session cookies (``cookies/``) and the browser profile
-(``chrome-profile/``) are secrets and are never committed. The tree:
+Persistent data lives under ``data/`` (git-ignored). The directory tree is:
 
     data/
     +-- chrome-profile/            persistent Chromium browser profile (keeps cf_clearance)
@@ -107,15 +107,14 @@ The special ``.indeed-state/`` directory is no longer used; state root defaults 
 
 ### Cookie expiry model
 
-- **Expiry:** the earliest expiry among auth cookies (the Passport bearer and
-  refresh tokens, plus SESS, CTK, SUB, LV, LD, UIMF, IRS, CSRF). When auth
-  cookies are browser-session cookies, the expiry is unknown and the session is
-  used until Indeed rejects it.
+- **Expiry:** the earliest expiry among auth cookies (SESS, CTK, SUB, LV, LD,
+  UIMF, IRS, CSRF). When auth cookies are browser-session cookies, the expiry is
+  unknown and the session is used until Indeed rejects it.
 - **Rotation:** every save/refresh is appended to history.jsonl; rotated cookie
   names are listed on refresh events.
 - **Revocation:** an Indeed redirect to secure.indeed.com/auth marks the session
   revoked and triggers re-login (unless --no-relogin).
-- **Privacy:** the cookie list is a credential - keep data/cookies/ private and
+- **Privacy:** the cookie list is a credential - keep .indeed-state/ private and
   out of version control.
 
 ## CSV conversion
@@ -185,9 +184,71 @@ ensure_ascii=False, separators=(",",":")`` over a ``dict`` keyed by field name
 python3 -m indeed_scraper organize
 
 # Output includes:
-# - A rich summary table (runs ingested, unique jobs, duplicate postings, new/updated/unchanged counts)
+# - A rich summary table (runs ingested, unique jobs, total postings, new/updated/unchanged counts, duplicates)
 # - A job listing table sorted by (company, title, location) with columns:
-#   Job ID, Company, Title, Location, Salary, Posted, Status
+#   Job ID, Company, Title, Location, Posted, Salary, Status, Dup
 #
 # If data/runs/ is empty, a friendly message is printed and no files are written.
 ```
+## Applying to jobs
+
+The `apply` command fills Indeed-hosted application forms from a profile you
+control. It is deliberately conservative: every irreversible step is guarded.
+
+```bash
+# 1. One-time: write the operator profile (0600, outside the repository)
+mkdir -p ~/.config/indeed_scraper && chmod 700 ~/.config/indeed_scraper
+$EDITOR ~/.config/indeed_scraper/profile.json
+
+# 2. Rehearse: fill the form, write a draft, submit nothing
+python3 -m indeed_scraper apply --dry-run --limit 3
+
+# 3. Apply for real, confirming each submission
+python3 -m indeed_scraper apply --limit 3
+
+# 4. Resume an interrupted application
+python3 -m indeed_scraper resume <job-id>
+
+# 5. Check how the applications are going
+python3 -m indeed_scraper check-responses
+```
+
+The profile holds what a form needs: `name`, `email`, `phone`, `resume_path`,
+`cover_letter`, `screening_answers`, plus `work_authorization`,
+`salary_expectations`, `availability`, `notice_period` and `visa_sponsorship`.
+An empty string means *not supplied* - the flow refuses to invent a value and
+raises a `FieldMissingError` naming the question instead.
+
+### What the flow guarantees
+
+- **Idempotent:** every application is reserved in `data/applications/ledger.jsonl`
+  *before* the browser is touched, keyed by the same SHA-256 fingerprint the
+  master dataset uses. A posting is never applied to twice.
+- **No unattended submits:** submission requires an explicit confirmation, and
+  `--dry-run` never submits at all.
+- **No fabricated answers:** a required field with no value in the profile stops
+  the flow and names the question.
+- **The shared session is protected:** a challenge (CAPTCHA / Cloudflare /
+  sign-in wall) stops the run instead of being retried, so the working scrape
+  session is never poisoned.
+- **Resumable:** each attempt writes `data/applications/drafts/<job-id>/draft.json`
+  so an interrupted fill can be picked up with `resume`.
+- **Rate limited:** `RiskBudget` caps applications per day (2 by default) and
+  enforces a minimum delay between submissions. Tune with
+  `INDEED_MAX_APPS_PER_DAY` and `INDEED_MIN_DELAY_MINUTES`.
+
+### Browser driver
+
+The flow prefers the browser-harness MCP's Chrome, attached over CDP
+(`INDEED_HARNESS_CDP`, default `http://127.0.0.1:9222`), and falls back to the
+repository's own persistent profile. The fallback matters: Indeed's bot
+protection rejects the harness' headless browser, while the warmed local
+profile carries the `cf_clearance` cookie and works.
+
+### Scope and limits
+
+External ATS pages (Greenhouse, Lever, Workday, ...) are detected and recorded
+as `external_portal_deferred` rather than automated - each portal has a
+different DOM, and a generic form filler would be unreliable. Offer acceptance
+and contract signing are never automated: those create binding commitments the
+agent cannot verify.

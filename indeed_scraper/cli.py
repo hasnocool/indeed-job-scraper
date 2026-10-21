@@ -308,6 +308,131 @@ def organize() -> None:
     organize_outputs(config, console)
 
 
+@app.command()
+def apply(
+    limit: int = typer.Option(10, "--limit", "-n", help="Maximum postings to consider."),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Fill the form and record it, but never submit."
+    ),
+    confirm: bool = typer.Option(
+        True, "--confirm/--no-confirm", help="Ask before each submission."
+    ),
+    profile_path: Path = typer.Option(  # noqa: B008 - typer's option pattern
+        None, "--profile", help="Profile file (default ~/.config/indeed_scraper/profile.json)."
+    ),
+) -> None:
+    """Apply to postings from the organized master dataset.
+
+    Every application is reserved in the ledger before the browser is touched,
+    and nothing is submitted without an explicit confirmation. A challenge stops
+    the run so the shared session is never poisoned.
+    """
+    from .apply.exceptions import ProfileNotFoundError
+    from .apply.flow import apply_to_jobs
+    from .apply.profile import load_profile
+    from .apply.reporting import write_apply_results
+    from .apply.workspace import ledger_path
+
+    try:
+        profile = load_profile(profile_path)
+    except ProfileNotFoundError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    config = _config()
+    store = CookieStore(config)
+    try:
+        results = apply_to_jobs(
+            config,
+            store,
+            console,
+            profile=profile,
+            limit=limit,
+            confirm=confirm,
+            dry_run=dry_run,
+        )
+    except IndeedScraperError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    if not results:
+        console.print("[yellow]Nothing to apply to.[/yellow]")
+        return
+    out = write_apply_results(results, config.state_dir / "applications" / "applications.csv")
+    table = Table(title="Applications")
+    table.add_column("Job ID", style="cyan")
+    table.add_column("Title")
+    table.add_column("Company")
+    table.add_column("Status")
+    table.add_column("Detail")
+    for result in results:
+        table.add_row(result.app_id, result.title[:40], result.company[:24], result.status, result.detail[:28])
+    console.print(table)
+    console.print(f"[green]results written to {out}[/green]")
+    console.print(f"[dim]ledger: {ledger_path(config)}[/dim]")
+
+
+@app.command("resume")
+def resume(
+    app_id: str = typer.Argument(..., help="Application id (the 12-char job id)."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Refill but do not submit."),
+    confirm: bool = typer.Option(True, "--confirm/--no-confirm", help="Ask before submitting."),
+) -> None:
+    """Resume an interrupted application from its persisted draft."""
+    from .apply.exceptions import ProfileNotFoundError
+    from .apply.flow import resume_application
+    from .apply.profile import load_profile
+
+    try:
+        profile = load_profile()
+    except ProfileNotFoundError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    config = _config()
+    store = CookieStore(config)
+    try:
+        result = resume_application(
+            config, store, console, app_id, profile=profile, confirm=confirm, dry_run=dry_run
+        )
+    except IndeedScraperError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+    if result is None:
+        raise typer.Exit(code=1)
+    console.print(f"[green]{app_id}: {result.status}[/green]")
+
+
+@app.command("check-responses")
+def check_responses() -> None:
+    """Refresh the response status of every submitted application.
+
+    Reads the application ledger and records the current status for each
+    submission. No polling, no scheduler: this is a manual command.
+    """
+    from .apply.workspace import ledger_path, responses_dir
+    from .response_monitor.indeed import collect_responses
+
+    config = _config()
+    records = collect_responses(ledger_path(config), responses_dir(config))
+    if not records:
+        console.print("[yellow]No submitted applications to check.[/yellow]")
+        return
+    table = Table(title="Application responses")
+    table.add_column("Job ID", style="cyan")
+    table.add_column("Title")
+    table.add_column("Status")
+    table.add_column("Checked")
+    for record in records:
+        table.add_row(
+            str(record.get("app_id", "")),
+            str(record.get("title", ""))[:40],
+            str(record.get("status", "")),
+            str(record.get("checked_at", ""))[:19],
+        )
+    console.print(table)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Entry point used by python -m and the legacy script."""
     try:

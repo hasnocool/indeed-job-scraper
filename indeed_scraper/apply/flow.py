@@ -1,0 +1,199 @@
+"""Orchestration for the application flow.
+
+One job at a time, in this order, with every irreversible step guarded:
+
+1. fingerprint the posting with the SAME hash the master list uses
+2. skip it if the ledger already holds a reservation or a submission
+3. reserve it atomically in the ledger BEFORE any browser action
+4. navigate, classify the destination, stop on a challenge
+5. fill the form from the operator profile (never invent a value)
+6. write a draft so an interrupted run can resume
+7. submit only with explicit operator approval, then mark it submitted
+
+A posting is attempted at most once: the ledger is the idempotency guard.
+"""
+
+from __future__ import annotations
+
+import time
+from datetime import datetime, timezone
+
+from rich.console import Console
+
+from ..config import Config
+from ..cookies import CookieStore
+from ..dedupe import job_fingerprint
+from .drafts import read_draft, write_draft
+from .driver import open_driver
+from .exceptions import ApplyBlockedError
+from .ledger import ApplicationLedger
+from .profile import Profile
+from .risk import RiskBudget
+from .types import ApplyResult
+from .worker import _apply_one, _result
+from .workspace import (
+    drafts_dir,
+    ledger_path,
+    load_master_jobs,
+)
+
+
+def _now_iso() -> str:
+    return datetime.now(tz=timezone.utc).isoformat()
+
+
+
+def apply_to_jobs(
+    config: Config,
+    store: CookieStore,
+    console: Console,
+    *,
+    profile: Profile,
+    limit: int | None = None,
+    confirm: bool = True,
+    dry_run: bool = False,
+    risk_budget: RiskBudget | None = None,
+) -> list[ApplyResult]:
+    """Apply to postings from the master dataset, one guarded job at a time."""
+    from . import indeed_form
+
+    budget = risk_budget or RiskBudget()
+    session = store.current()
+    if session is None or not session.is_signed_in():
+        raise ApplyBlockedError("no-session", "")
+
+    jobs = load_master_jobs(config)
+    if not jobs:
+        console.print("[yellow]No jobs in the master dataset - run 'scrape' first.[/yellow]")
+        return []
+    if limit is not None:
+        jobs = jobs[:limit]
+
+    ledger = ApplicationLedger(ledger_path(config))
+    results: list[ApplyResult] = []
+    last_submit: datetime | None = None
+
+    with open_driver(config, session) as (context, info):
+        console.print(f"[dim]driver: {info.kind} ({info.endpoint})[/dim]")
+        page = context.pages[0] if context.pages else context.new_page()
+        for job in jobs:
+            fingerprint = job_fingerprint(job)
+            if ledger.status_of(fingerprint) in {"reserved", "submitted"}:
+                console.print(f"[dim]skip {job.title[:40]} - already applied[/dim]")
+                results.append(_result(job, fingerprint, "failed", "unknown", "duplicate"))
+                continue
+            if not budget.can_apply(ledger):
+                console.print("[yellow]risk budget reached - stopping for today.[/yellow]")
+                break
+            if not dry_run and last_submit is not None:
+                wait = budget.delay_seconds(last_submit)
+                if wait > 0:
+                    console.print(f"[dim]waiting {int(wait)}s before the next application[/dim]")
+                    time.sleep(wait)
+            try:
+                result = _apply_one(
+                    page,
+                    job,
+                    fingerprint,
+                    profile,
+                    ledger,
+                    config,
+                    console,
+                    confirm=confirm,
+                    dry_run=dry_run,
+                )
+            except ApplyBlockedError as error:
+                console.print(f"[red]blocked: {error}[/red]")
+                results.append(_result(job, fingerprint, "blocked", "unknown", str(error)))
+                if budget.stop_on_captcha:
+                    console.print("[red]challenge detected - stopping this run.[/red]")
+                    break
+                continue
+            results.append(result)
+            if result.status == "submitted":
+                last_submit = datetime.now(tz=timezone.utc)
+        del indeed_form
+    return results
+
+
+def resume_application(
+    config: Config,
+    store: CookieStore,
+    console: Console,
+    app_id: str,
+    *,
+    profile: Profile,
+    confirm: bool = True,
+    dry_run: bool = False,
+) -> ApplyResult | None:
+    """Resume an interrupted application from its persisted draft."""
+    from . import indeed_form
+
+    session = store.current()
+    if session is None or not session.is_signed_in():
+        raise ApplyBlockedError("no-session", "")
+
+    draft = read_draft(drafts_dir(config), app_id)
+    if not draft:
+        console.print(f"[yellow]No draft found for {app_id}.[/yellow]")
+        return None
+
+    ledger = ApplicationLedger(ledger_path(config))
+    fingerprint = str(draft.get("fingerprint", ""))
+    url = str(draft.get("current_url", ""))
+    if not url:
+        console.print("[yellow]Draft has no URL to resume from.[/yellow]")
+        return None
+
+    with open_driver(config, session) as (context, info):
+        console.print(f"[dim]driver: {info.kind} ({info.endpoint})[/dim]")
+        page = context.pages[0] if context.pages else context.new_page()
+        page.goto(url, wait_until="domcontentloaded", timeout=config.navigation_timeout_ms)
+        page.wait_for_timeout(2000)
+        challenge = indeed_form.detect_challenge(page)
+        if challenge:
+            ledger.mark(fingerprint, "blocked", f"challenge:{challenge}")
+            raise ApplyBlockedError(challenge, url)
+        filled = indeed_form.fill_indeed_form(page, profile, draft)
+        write_draft(drafts_dir(config), app_id, filled)
+        if dry_run:
+            console.print("[cyan]dry-run[/cyan] resumed fill, not submitted")
+            return ApplyResult(
+                jk=str(draft.get("jk", "")),
+                title=str(draft.get("title", "")),
+                company=str(draft.get("company", "")),
+                location=str(draft.get("location", "")),
+                url=url,
+                fingerprint=fingerprint,
+                app_id=app_id,
+                status="reserved",
+                portal="indeed",
+                detail="dry_run_resume",
+            )
+        if confirm:
+            console.print("[bold]Submit the resumed application?[/bold]")
+            if not console.input("[yellow]type 'yes' to submit: [/yellow]").strip().lower().startswith("y"):
+                ledger.mark(fingerprint, "failed", "operator_declined")
+                return None
+        submitted = indeed_form.submit_application(page)
+        if submitted:
+            ledger.mark(fingerprint, "submitted", "")
+            console.print(f"[green]submitted[/green] resumed application {app_id}")
+        else:
+            ledger.mark(fingerprint, "failed", "submit_not_confirmed")
+        return ApplyResult(
+            jk=str(draft.get("jk", "")),
+            title=str(draft.get("title", "")),
+            company=str(draft.get("company", "")),
+            location=str(draft.get("location", "")),
+            url=url,
+            fingerprint=fingerprint,
+            app_id=app_id,
+            status="submitted" if submitted else "failed",
+            portal="indeed",
+            detail="" if submitted else "submit_not_confirmed",
+        )
+
+
+
+
