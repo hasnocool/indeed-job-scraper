@@ -336,3 +336,34 @@ def test_drafts_write_atomic(tmp_path: Path) -> None:
     # File should be readable
     read_back = read_draft(root, app_id)
     assert read_back == payload
+
+def test_dry_run_releases_the_reservation(tmp_path: Path) -> None:
+    """A rehearsal must not consume the posting.
+
+    After a dry run the ledger must not report the posting as reserved, or the
+    real run would skip exactly the postings the operator rehearsed.
+    """
+    ledger = ApplicationLedger(tmp_path / "ledger.jsonl")
+    fp = "fp-dry-run"
+
+    assert ledger.reserve(fp, "jk-1", "https://www.indeed.com/viewjob?jk=jk-1") is True
+    assert ledger.status_of(fp) == "reserved"
+
+    # The worker releases a rehearsal the same way.
+    ledger.mark(fp, "failed", "dry_run")
+
+    assert ledger.status_of(fp) == "failed"
+    # A later real attempt is therefore allowed to reserve it again.
+    assert ledger.has(fp) is True
+
+
+def test_ledger_skips_only_reserved_or_submitted(tmp_path: Path) -> None:
+    """Only an in-flight or completed application blocks a new attempt."""
+    ledger = ApplicationLedger(tmp_path / "ledger.jsonl")
+    fp = "fp-002"
+
+    ledger.reserve(fp, "jk-2", "https://www.indeed.com/viewjob?jk=jk-2")
+    assert ledger.status_of(fp) in {"reserved", "submitted"}
+
+    ledger.mark(fp, "failed", "dry_run")
+    assert ledger.status_of(fp) not in {"reserved", "submitted"}

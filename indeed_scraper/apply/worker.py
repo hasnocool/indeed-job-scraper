@@ -133,8 +133,11 @@ def _fill_and_submit(
     write_draft(drafts_dir(config), app_id_for(fingerprint), draft)
 
     if dry_run:
+        # A rehearsal must not consume the posting: release the reservation so
+        # the real run can still apply to it.
+        ledger.mark(fingerprint, "failed", "dry_run")
         console.print(f"[cyan]dry-run[/cyan] {job.title[:40]} - filled, not submitted")
-        return _result(job, fingerprint, "reserved", portal, "dry_run")
+        return _result(job, fingerprint, "failed", portal, "dry_run")
 
     if confirm:
         console.print(f"[bold]Submit application for {job.title} ({job.company})?[/bold]")
