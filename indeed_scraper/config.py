@@ -77,6 +77,19 @@ class Config:
         return self.cookies_dir / "history.jsonl"
 
     @property
+    def runs_dir(self) -> Path:
+        return self.state_dir / "runs"
+
+    @property
+    def latest_dir(self) -> Path:
+        return self.state_dir / "latest"
+
+    @property
+    def master_dir(self) -> Path:
+        return self.state_dir / "master"
+
+    # output_dir is replaced by runs_dir/latest_dir/master_dir; kept for backward compat
+    @property
     def output_dir(self) -> Path:
         return self.state_dir / "output"
 
@@ -90,7 +103,9 @@ class Config:
             self.profile_dir,
             self.cookies_dir,
             self.sessions_dir,
-            self.output_dir,
+            self.runs_dir,
+            self.latest_dir,
+            self.master_dir,
         ):
             path.mkdir(parents=True, exist_ok=True)
 
@@ -105,7 +120,7 @@ class Config:
         login_timeout_s: int | None = None,
     ) -> Config:
         raw_root = os.environ.get("INDEED_STATE_DIR")
-        root = state_dir or (Path(raw_root) if raw_root else REPO_ROOT / ".indeed-state")
+        root = state_dir or (Path(raw_root) if raw_root else REPO_ROOT / "data")
         chosen_site = site or os.environ.get("INDEED_SITE") or DEFAULT_SITE
         delay = DEFAULT_PAGE_DELAY_S if page_delay_s is None else page_delay_s
         timeout = DEFAULT_LOGIN_TIMEOUT_S if login_timeout_s is None else login_timeout_s

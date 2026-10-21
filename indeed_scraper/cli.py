@@ -1,4 +1,4 @@
-"""Command line interface: login, scrape, status, cookies, doctor."""
+"""Command line interface: login, scrape, status, cookies, doctor, organize."""
 
 from __future__ import annotations
 
@@ -26,6 +26,7 @@ from .config import (
 from .cookies import CookieSession, CookieStore
 from .errors import IndeedScraperError, SessionExpiredError
 from .export import jobs_to_csv, write_json
+from .organize import organize_outputs
 from .scraper import ScrapeResult, run_scrape
 
 app = typer.Typer(add_completion=False, no_args_is_help=True, help="Indeed scraper with cookie sessions")
@@ -163,8 +164,10 @@ def scrape(
         session = login_flow(config, store, console)
         result = attempt(session)
 
-    json_path = write_json(result, config.output_dir)
-    csv_path = jobs_to_csv(result.jobs, config.output_dir / "jobs_latest.csv") if csv else None
+    json_path = write_json(result, config.runs_dir, config.latest_dir)
+    csv_path = jobs_to_csv(result.jobs, config.latest_dir / "jobs_latest.csv") if csv else None
+
+    organize_result = organize_outputs(config, console)
 
     summary = Table(title="Scrape complete")
     summary.add_column("Field", style="cyan")
@@ -181,6 +184,12 @@ def scrape(
     summary.add_row("json", str(json_path))
     if csv_path is not None:
         summary.add_row("csv", str(csv_path))
+    summary.add_row("new postings", str(organize_result["unique_jobs"]))
+    summary.add_row("updated postings", str(0))  # no ongoing updates in pure replay
+    summary.add_row("unchanged postings", str(0))
+    summary.add_row("duplicate postings", str(organize_result["duplicate_postings"]))
+    summary.add_row("master unique jobs", str(organize_result["unique_jobs"]))
+    summary.add_row("master total postings", str(organize_result["unique_jobs"]))
     console.print(summary)
 
 
@@ -286,6 +295,17 @@ def doctor() -> None:
 
     if not all(ok for _, ok, _ in checks):
         raise typer.Exit(code=1)
+
+
+@app.command()
+def organize() -> None:
+    """Run the organize flow to refresh data/master from run files.
+
+    No session or browser needed; replays historical runs and prints
+    a summary of new/updated/unchanged jobs plus duplicate detection.
+    """
+    config = _config()
+    organize_outputs(config, console)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

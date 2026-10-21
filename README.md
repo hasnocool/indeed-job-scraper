@@ -56,6 +56,7 @@ The legacy entry point still works and forwards every flag to scrape:
 | status | Show the session, expiry and recent cookie history. |
 | cookies | Print the cookie list in use (--json for the raw list). |
 | doctor | Check Python, Playwright, Chromium, state dir and Indeed reachability. |
+| organize | Replay run files and refresh the deduped master dataset (no browser needed). |
 
 ## Search options
 
@@ -81,23 +82,28 @@ The legacy entry point still works and forwards every flag to scrape:
 A page that redirects to the sign-in wall stops the run with a clear
 "session no longer valid" error instead of returning partial results.
 
-## Where things are stored
+## Data layout
 
-Everything lives under .indeed-state/ (git-ignored):
+Persistent data lives under ``data/``. The scrape history (``runs/``) and the
+organized master list (``master/``) are versioned so the mirror keeps a second
+copy; the session cookies (``cookies/``) and the browser profile
+(``chrome-profile/``) are secrets and are never committed. The tree:
 
-    .indeed-state/
-    +-- chrome-profile/            persistent Chromium profile (keeps cf_clearance)
+    data/
+    +-- chrome-profile/            persistent Chromium browser profile (keeps cf_clearance)
     +-- cookies/
     |   +-- current.json           the cookie list currently in use
     |   +-- sessions/*.json        every session snapshot ever captured
     |   +-- history.jsonl          append-only log: saved / refreshed / expired / revoked
-    +-- output/
-        +-- jobs_<timestamp>.json  structured results for one run (per-location stats)
-        +-- jobs_latest.json       most recent run
-        +-- jobs_latest.csv        most recent run as CSV
+    +-- runs/                     **per-run exports**: ``jobs_YYYYMMDD-HHMMSS.json``
+    +-- latest/                   **most-recent mirror**: ``jobs_latest.json`` +
+                                   ``jobs_latest.csv`` (identical to latest run)
+    +-- master/                   **cross-run deduped organized output**:
+                                   ``jobs_master.json`` and ``jobs_master.csv``
+    +-- legacy/                   old CSV dumps (scanned only for compatibility)
 
-Set INDEED_STATE_DIR or INDEED_SITE to relocate state or target a different
-Indeed host.
+The special ``.indeed-state/`` directory is no longer used; state root defaults to
+``data/`` under the repo root. Set ``INDEED_STATE_DIR`` to override.
 
 ### Cookie expiry model
 
@@ -113,8 +119,8 @@ Indeed host.
 
 ## CSV conversion
 
-    python3 parse_json_file_to_csv.py                       # newest output JSON
-    python3 parse_json_file_to_csv.py .indeed-state/output/jobs_20261020-195619.json
+    python3 -m indeed_scraper organize   # writes data/master/jobs_master.json + .csv
+    python3 -m indeed_scraper scrape      # appends new run, refreshes data/master
 
 ## Project layout
 
@@ -136,3 +142,51 @@ Indeed host.
   browser, paces pages, and lets you clear any challenge by hand.
 - Keep the page delay at 5 seconds or more and avoid parallel runs.
 - Scraping is subject to Indeed's Terms of Service; use for personal research.
+
+## Deduplication and organization
+
+### Hash design
+
+The fingerprint is a ``sha256`` hexdigest computed from canonical JSON of five
+fields: ``title``, ``company``, ``location``, ``salary``, ``schedule`` (``
+FINGERPRINT_FIELDS ``).  The ``json.dumps`` call uses ``sort_keys=True,
+ensure_ascii=False, separators=(",",":")`` over a ``dict`` keyed by field name
+→ value, encoded ``utf-8``.
+
+**Why these fields are excluded:**
+
+- ``jk`` + ``url`` — identical content under different job keys is caught (re-post
+  detection across runs).
+- ``posted`` — relative-age drift between runs makes identical jobs appear
+  "different" if posted dates shift.
+- ``snippet`` — variable truncation and formatting differences between runs.
+- ``matches`` — per-run location context; the same job may match different
+  location sets in different runs.
+
+**Benefits (cross-run dedup):**
+
+- **Re-post detection:** identical content under different ``jk``/``url`` is caught
+  via the fingerprint; the ``duplicate_of`` field links duplicates to the
+  canonical job.
+- **Change detection:** ``updated`` status flags jobs whose content fingerprint
+  changed between runs; ``unchanged`` confirms stability.
+- **12‑char stable job IDs:** ``short_id()`` returns the first 12 hex chars of
+  the fingerprint, providing a readable, consistent identifier.
+- **Idempotent regeneration:** ``data/runs/*.json`` are the sole source of truth;
+  deleting ``data/master/`` and running ``organize`` rebuilds everything without
+  needing a re-scrape.
+- **Stable 12-char job IDs** for display and CSV export.
+
+### ``organize`` command usage
+
+```bash
+# Refresh the master directory from historical runs
+python3 -m indeed_scraper organize
+
+# Output includes:
+# - A rich summary table (runs ingested, unique jobs, duplicate postings, new/updated/unchanged counts)
+# - A job listing table sorted by (company, title, location) with columns:
+#   Job ID, Company, Title, Location, Salary, Posted, Status
+#
+# If data/runs/ is empty, a friendly message is printed and no files are written.
+```
