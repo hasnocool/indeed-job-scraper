@@ -30,6 +30,7 @@ CARD = """
   <ul class="heading6 tapItem-gutter metadataContainer">
     <li data-testid="attribute_snippet_testid" class="salary-snippet-container">$120,000 a year</li>
     <li data-testid="attribute_snippet_testid">Full-time</li>
+    <li data-testid="attribute_snippet_testid">Day shift</li>
   </ul>
 </div>
 """
@@ -38,6 +39,26 @@ AGED_CARD = CARD.replace(
     '<div class="mosaic-provider-jobcards-1bj97w3">New</div>',
     '<div class="mosaic-provider-jobcards-1bj97w3">3 days ago</div>',
 )
+
+# Indeed rotates the order of the attribute chips between runs, so the same
+# posting can show "Full-time" first on one visit and "Day shift" first on the
+# next. The extractor therefore collects every chip, sorted, so the value (and
+# the fingerprint built from it) stays stable across runs.
+SHIFTED_CARD = """
+<div class="job_seen_beacon" data-jk="abc123">
+  <h2 class="jobTitle"><a class="jcs-JobTitle" data-jk="abc123">
+    <span>Senior Data Engineer</span></a></h2>
+  <div class="company_location">
+    <span data-testid="company-name">Northwind Analytics</span>
+    <div data-testid="text-location">Vancouver, BC</div>
+  </div>
+  <ul class="heading6 tapItem-gutter metadataContainer">
+    <li data-testid="attribute_snippet_testid">Day shift</li>
+    <li data-testid="attribute_snippet_testid" class="salary-snippet-container">$120,000 a year</li>
+    <li data-testid="attribute_snippet_testid">Full-time</li>
+  </ul>
+</div>
+"""
 
 
 def _page():
@@ -72,7 +93,7 @@ def test_extracts_mosaic_card_fields(page) -> None:
     assert job.company == "Northwind Analytics"
     assert job.location == "Vancouver, BC"
     assert job.salary == "$120,000 a year"
-    assert job.schedule == "Full-time"
+    assert job.schedule == "Day shift; Full-time"
     assert job.url.endswith("jk=abc123")
 
 
@@ -92,3 +113,23 @@ def test_posted_is_empty_without_an_age_badge(page) -> None:
     page.set_content(CARD.replace('<div class="mosaic-provider-jobcards-1bj97w3">New</div>', ""))
     jobs = extract_jobs(page)
     assert jobs[0].posted == ""
+
+
+def test_schedule_is_stable_across_attribute_chip_order(page) -> None:
+    """Indeed rotates chip order between runs; the value must not change."""
+    page.set_content(CARD)
+    first = extract_jobs(page)
+    page.set_content(SHIFTED_CARD)
+    second = extract_jobs(page)
+    # Same chips, different DOM order -> identical schedule value.
+    assert first[0].schedule == "Day shift; Full-time"
+    assert second[0].schedule == first[0].schedule
+
+
+def test_schedule_collects_all_attribute_chips(page) -> None:
+    page.set_content(SHIFTED_CARD)
+    jobs = extract_jobs(page)
+    assert jobs[0].schedule == "Day shift; Full-time"
+    # The salary chip must not leak into the schedule field.
+    assert "$120,000" not in jobs[0].schedule
+    assert jobs[0].salary == "$120,000 a year"

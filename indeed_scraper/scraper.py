@@ -39,11 +39,25 @@ _EXTRACT_JS = r"""(() => {
   const text = (node) => clean(node && node.innerText ? node.innerText : '');
   const pick = (el, sels) => {
     for (const sel of sels) {
-      const node = el.querySelector(sel);
-      const value = text(node);
-      if (value) return value;
+      // Scan every match, not just the first: the first attribute chip can be
+      // an empty placeholder, and returning it would blank the field.
+      for (const node of el.querySelectorAll(sel)) {
+        const value = text(node);
+        if (value) return value;
+      }
     }
     return '';
+  };
+  const pickAll = (el, sels) => {
+    const values = [];
+    for (const sel of sels) {
+      for (const node of el.querySelectorAll(sel)) {
+        const value = text(node);
+        if (value && !values.includes(value)) values.push(value);
+      }
+      if (values.length) break;
+    }
+    return values.sort().join('; ');
   };
   const add = (jk, field, value) => {
     if (!value) return;
@@ -70,7 +84,7 @@ _EXTRACT_JS = r"""(() => {
     add(jk, 'company', pick(card, ['[data-testid="company-name"]', '.companyName', '[data-company-name]']));
     add(jk, 'location', pick(card, ['[data-testid="text-location"]', '.companyLocation', '[data-testid="job-location"]']));
     add(jk, 'salary', pick(card, ['li.salary-snippet-container', '.salary-snippet-container', '.salary-snippet', '.estimated-salary', '[data-testid="salary-snippet"]']));
-    add(jk, 'schedule', pick(card, ['li[data-testid="attribute_snippet_testid"]:not(.salary-snippet-container)', '.jobTitleSnippet']));
+    add(jk, 'schedule', pickAll(card, ['li[data-testid="attribute_snippet_testid"]:not(.salary-snippet-container)']) || pick(card, ['.jobTitleSnippet']));
     add(jk, 'posted', pick(card, ['[data-testid="job-age"]', 'span.date', '.date', '[data-testid="myJobsStateDate"]']) || findAge(card));
     add(jk, 'snippet', pick(card, ['.job-snippet', '[data-testid="belowJobSnippet"]', '.summary']).slice(0, 400));
     add(jk, 'url', 'https://www.indeed.com/viewjob?jk=' + jk);
