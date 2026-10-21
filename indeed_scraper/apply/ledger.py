@@ -159,9 +159,14 @@ class ApplicationLedger:
         The ledger is append-only: this adds a new line and never rewrites the
         file, so a crash cannot truncate the history. The last line for a
         fingerprint carries its current status.
+
+        The job metadata (``jk``, ``indeed_url``, ``company``, ``title``) is
+        carried forward from the reservation, so a consumer reading only the
+        latest line still knows which posting the status refers to.
         """
         with self._lock():
-            self._append_line(
+            record = self._metadata_for(fingerprint)
+            record.update(
                 {
                     "fingerprint": fingerprint,
                     "status": status,
@@ -169,7 +174,21 @@ class ApplicationLedger:
                     "applied_at": _now_iso(),
                 }
             )
+            self._append_line(record)
             self._reparse()
+
+    def _metadata_for(self, fingerprint: str) -> dict:
+        """The job metadata known for a fingerprint (from its reservation)."""
+        self._reparse()
+        known: dict = {}
+        for entry in self._entries:
+            if entry.get("fingerprint") != fingerprint:
+                continue
+            for key in ("jk", "indeed_url", "company", "title"):
+                value = entry.get(key)
+                if value:
+                    known[key] = value
+        return known
 
     def status_of(self, fingerprint: str) -> str | None:
         """Return the latest status recorded for a fingerprint."""

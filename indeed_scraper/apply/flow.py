@@ -75,7 +75,9 @@ def apply_to_jobs(
 
     with open_driver(config, session) as (context, info):
         console.print(f"[dim]driver: {info.kind} ({info.endpoint})[/dim]")
-        page = context.pages[0] if context.pages else context.new_page()
+        existing_pages = list(context.pages)
+        page = existing_pages[0] if existing_pages else context.new_page()
+        owns_page = not existing_pages
         for job in jobs:
             fingerprint = job_fingerprint(job)
             if ledger.status_of(fingerprint) in {"reserved", "submitted"}:
@@ -113,6 +115,8 @@ def apply_to_jobs(
             if result.status == "submitted":
                 last_submit = datetime.now(tz=timezone.utc)
         del indeed_form
+        if owns_page:
+            page.close()
     return results
 
 
@@ -125,6 +129,7 @@ def resume_application(
     profile: Profile,
     confirm: bool = True,
     dry_run: bool = False,
+    risk_budget: RiskBudget | None = None,
 ) -> ApplyResult | None:
     """Resume an interrupted application from its persisted draft."""
     from . import indeed_form
@@ -145,6 +150,11 @@ def resume_application(
         console.print("[yellow]Draft has no URL to resume from.[/yellow]")
         return None
 
+    budget = risk_budget or RiskBudget()
+    if not dry_run and not budget.can_apply(ledger):
+        console.print("[yellow]daily application budget reached - not resuming.[/yellow]")
+        return None
+
     # Idempotency guard: a posting that already reached a terminal state must
     # never be re-submitted by a resume.
     previous = ledger.status_of(fingerprint) if fingerprint else None
@@ -156,17 +166,43 @@ def resume_application(
 
     with open_driver(config, session) as (context, info):
         console.print(f"[dim]driver: {info.kind} ({info.endpoint})[/dim]")
-        page = context.pages[0] if context.pages else context.new_page()
-        page.goto(url, wait_until="domcontentloaded", timeout=config.navigation_timeout_ms)
-        page.wait_for_timeout(2000)
-        challenge = indeed_form.detect_challenge(page)
-        if challenge:
-            ledger.mark(fingerprint, "blocked", f"challenge:{challenge}")
-            raise ApplyBlockedError(challenge, url)
-        filled = indeed_form.fill_indeed_form(page, profile)
-        write_draft(drafts_dir(config), app_id, draft_payload(draft, filled))
-        if dry_run:
-            console.print("[cyan]dry-run[/cyan] resumed fill, not submitted")
+        existing_pages = list(context.pages)
+        page = existing_pages[0] if existing_pages else context.new_page()
+        owns_page = not existing_pages
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=config.navigation_timeout_ms)
+            page.wait_for_timeout(2000)
+            challenge = indeed_form.detect_challenge(page)
+            if challenge:
+                ledger.mark(fingerprint, "blocked", f"challenge:{challenge}")
+                raise ApplyBlockedError(challenge, url)
+            filled = indeed_form.fill_indeed_form(page, profile)
+            write_draft(drafts_dir(config), app_id, draft_payload(draft, filled))
+            if dry_run:
+                console.print("[cyan]dry-run[/cyan] resumed fill, not submitted")
+                return ApplyResult(
+                    jk=str(draft.get("jk", "")),
+                    title=str(draft.get("title", "")),
+                    company=str(draft.get("company", "")),
+                    location=str(draft.get("location", "")),
+                    url=url,
+                    fingerprint=fingerprint,
+                    app_id=app_id,
+                    status="reserved",
+                    portal="indeed",
+                    detail="dry_run_resume",
+                )
+            if confirm:
+                console.print("[bold]Submit the resumed application?[/bold]")
+                if not console.input("[yellow]type 'yes' to submit: [/yellow]").strip().lower().startswith("y"):
+                    ledger.mark(fingerprint, "failed", "operator_declined")
+                    return None
+            submitted = indeed_form.submit_application(page)
+            if submitted:
+                ledger.mark(fingerprint, "submitted", "")
+                console.print(f"[green]submitted[/green] resumed application {app_id}")
+            else:
+                ledger.mark(fingerprint, "failed", "submit_not_confirmed")
             return ApplyResult(
                 jk=str(draft.get("jk", "")),
                 title=str(draft.get("title", "")),
@@ -175,33 +211,15 @@ def resume_application(
                 url=url,
                 fingerprint=fingerprint,
                 app_id=app_id,
-                status="reserved",
+                status="submitted" if submitted else "failed",
                 portal="indeed",
-                detail="dry_run_resume",
+                detail="" if submitted else "submit_not_confirmed",
             )
-        if confirm:
-            console.print("[bold]Submit the resumed application?[/bold]")
-            if not console.input("[yellow]type 'yes' to submit: [/yellow]").strip().lower().startswith("y"):
-                ledger.mark(fingerprint, "failed", "operator_declined")
-                return None
-        submitted = indeed_form.submit_application(page)
-        if submitted:
-            ledger.mark(fingerprint, "submitted", "")
-            console.print(f"[green]submitted[/green] resumed application {app_id}")
-        else:
-            ledger.mark(fingerprint, "failed", "submit_not_confirmed")
-        return ApplyResult(
-            jk=str(draft.get("jk", "")),
-            title=str(draft.get("title", "")),
-            company=str(draft.get("company", "")),
-            location=str(draft.get("location", "")),
-            url=url,
-            fingerprint=fingerprint,
-            app_id=app_id,
-            status="submitted" if submitted else "failed",
-            portal="indeed",
-            detail="" if submitted else "submit_not_confirmed",
-        )
+        finally:
+            # Close the tab only if this flow opened it, so a challenge page is
+            # never left open in the shared browser.
+            if owns_page:
+                page.close()
 
 
 

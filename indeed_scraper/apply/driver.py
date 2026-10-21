@@ -63,21 +63,15 @@ def _harness_driver(
     endpoint: str, session: CookieSession
 ) -> Iterator[tuple[Any, DriverInfo]]:
     """Drive the harness browser, closing only the tabs we opened."""
-    from playwright.sync_api import Error, sync_playwright
+    from playwright.sync_api import sync_playwright
 
     with sync_playwright() as pw:
-        browser, context = _harness_context(pw, endpoint, session)
+        _browser, context = _harness_context(pw, endpoint, session)
         info = DriverInfo(kind="harness", endpoint=endpoint, harness_reachable=True)
-        try:
-            yield context, info
-        finally:
-            for page in list(context.pages):
-                if page.url == "about:blank":
-                    page.close()
-            try:
-                browser.close()
-            except Error:  # the shared browser may already be gone
-                pass
+        # The harness browser is a SHARED resource: closing it would kill the
+        # session other tools use, so it is only disconnected here. The flow
+        # closes the tab it opened (see open_driver's callers).
+        yield context, info
 
 
 @contextmanager

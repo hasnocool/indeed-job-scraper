@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .store import write_response
@@ -13,6 +14,11 @@ RESPONSE_STATUSES = ("applied", "viewed", "interview", "rejected", "withdrawn", 
 from indeed_scraper.apply.drafts import (
     app_id_for,
 )
+
+
+def _now_iso() -> str:
+    """The current UTC time, ISO 8601."""
+    return datetime.now(tz=timezone.utc).isoformat()
 
 
 def parse_status(text: str) -> str:
@@ -118,7 +124,7 @@ def collect_responses(
         else:
             response_status = "unknown"
 
-        checked_at = entry.get("checked_at", "")
+        checked_at = _now_iso()
 
         record = {
             "app_id": app_id,

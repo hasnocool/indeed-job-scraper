@@ -314,9 +314,6 @@ def apply(
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Fill the form and record it, but never submit."
     ),
-    confirm: bool = typer.Option(
-        True, "--confirm/--no-confirm", help="Ask before each submission."
-    ),
     profile_path: Path = typer.Option(  # noqa: B008 - typer's option pattern
         None, "--profile", help="Profile file (default ~/.config/indeed_scraper/profile.json)."
     ),
@@ -324,8 +321,9 @@ def apply(
     """Apply to postings from the organized master dataset.
 
     Every application is reserved in the ledger before the browser is touched,
-    and nothing is submitted without an explicit confirmation. A challenge stops
-    the run so the shared session is never poisoned.
+    and a submission ALWAYS requires the operator to confirm it - there is no
+    flag that skips that gate. A challenge stops the run so the shared session is
+    never poisoned.
     """
     from .apply.exceptions import ProfileNotFoundError
     from .apply.flow import apply_to_jobs
@@ -348,7 +346,7 @@ def apply(
             console,
             profile=profile,
             limit=limit,
-            confirm=confirm,
+            confirm=True,
             dry_run=dry_run,
         )
     except IndeedScraperError as error:
@@ -376,7 +374,6 @@ def apply(
 def resume(
     app_id: str = typer.Argument(..., help="Application id (the 12-char job id)."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Refill but do not submit."),
-    confirm: bool = typer.Option(True, "--confirm/--no-confirm", help="Ask before submitting."),
 ) -> None:
     """Resume an interrupted application from its persisted draft."""
     from .apply.exceptions import ProfileNotFoundError
@@ -393,7 +390,7 @@ def resume(
     store = CookieStore(config)
     try:
         result = resume_application(
-            config, store, console, app_id, profile=profile, confirm=confirm, dry_run=dry_run
+            config, store, console, app_id, profile=profile, confirm=True, dry_run=dry_run
         )
     except IndeedScraperError as error:
         console.print(f"[red]{error}[/red]")
