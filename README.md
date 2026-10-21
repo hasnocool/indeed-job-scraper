@@ -274,6 +274,26 @@ agrees to contractual terms. That is a binding commitment made on the
 operator's behalf, and it is only sent unattended when
 ``allow_binding_commitments`` is true.
 
+## The operator profile
+
+The profile is what the agent puts on a form. It lives outside the repository at
+``~/.config/indeed_scraper/profile.json`` (0600):
+
+```bash
+# create the template with the right permissions
+python3 -m indeed_scraper profile init
+
+# check it, and whether the resume is usable
+python3 -m indeed_scraper profile show
+
+# point it at your real resume PDF
+python3 -m indeed_scraper profile set-resume ~/Documents/my-resume.pdf
+```
+
+The resume is **validated before anything is applied**: it must exist, be a
+PDF, and be a real document (at least 1 KB). A placeholder is refused with an
+explicit message, because a stub would be uploaded to an employer.
+
 ## Replying to recruiters
 
 Indeed's candidate inbox is a separate web app (``messages.indeed.com``)

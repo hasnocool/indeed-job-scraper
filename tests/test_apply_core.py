@@ -141,13 +141,19 @@ def test_profile_load_raises_when_absent(tmp_path: Path) -> None:
     assert "not found" in str(excinfo.value).lower() or "nonexistent" in str(excinfo.value).lower()
 
 
+def _write_resume(path: Path) -> Path:
+    """A PDF big enough and shaped enough to pass the resume validation."""
+    path.write_bytes(b"%PDF-1.4\n" + b"0 " * 2048)
+    return path
+
+
 def test_profile_save_writes_0600_and_roundtrips(tmp_path: Path) -> None:
     """save writes mode 0600 and load round-trips."""
     profile = Profile(
         name="Test User",
         email="test@example.com",
         phone="123-456-7890",
-        resume_path="/resumes/test.pdf",
+        resume_path=str(_write_resume(tmp_path / "test.pdf")),
     )
     save_profile(profile, tmp_path / "profile.json")
     p = tmp_path / "profile.json"
@@ -171,7 +177,7 @@ def test_profile_save_atomic_no_leftover_tempfiles(tmp_path: Path) -> None:
         name="Atomic User",
         email="atomic@example.com",
         phone="000-000-0000",
-        resume_path="/resumes/atomic.pdf",
+        resume_path=str(_write_resume(tmp_path / "atomic.pdf")),
     )
     save_profile(profile, tmp_path / "profile2.json")
     p = tmp_path / "profile2.json"
@@ -191,7 +197,7 @@ def test_profile_apply_data_maps_fields(tmp_path: Path) -> None:
         name="Mapper",
         email="m@example.com",
         phone="555-5555",
-        resume_path="/resumes/resume.pdf",
+        resume_path=str(_write_resume(tmp_path / "resume.pdf")),
         cover_letter="My cover letter",
         screening_answers={"q1": "a1"},
         work_authorization="",
@@ -204,7 +210,7 @@ def test_profile_apply_data_maps_fields(tmp_path: Path) -> None:
     assert mapped.name == "Mapper"
     assert mapped.email == "m@example.com"
     assert mapped.phone == "555-5555"
-    assert mapped.resume_path == "/resumes/resume.pdf"
+    assert mapped.resume_path.endswith("resume.pdf")
     assert mapped.cover_letter == "My cover letter"
     assert mapped.screening_answers == {"q1": "a1"}
 
@@ -215,7 +221,7 @@ def test_profile_work_authorization_loads_empty_not_fabricated(tmp_path: Path) -
         name="No Auth",
         email="noauth@example.com",
         phone="000-000-0000",
-        resume_path="/resumes.pdf",
+        resume_path=str(_write_resume(tmp_path / "resumes.pdf")),
         work_authorization="",
     )
     save_profile(profile, tmp_path / "profile3.json")

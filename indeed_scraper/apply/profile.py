@@ -37,6 +37,45 @@ class Profile(BaseModel):
         return v
 
 
+#: A real resume PDF is far larger than this; anything smaller is a stub.
+MIN_RESUME_BYTES = 1024
+PDF_MAGIC = b"%PDF"
+
+
+def validate_resume(path: Path) -> Path:
+    """Check that the resume is a real PDF, not a placeholder.
+
+    A stub resume would be uploaded to an employer, so the flow refuses to
+    run with one and says exactly what is wrong.
+    """
+    if not path.is_file():
+        raise ProfileNotFoundError(
+            f"No resume file at {path}. Put your PDF there, or point resume_path at it."
+        )
+    size = path.stat().st_size
+    if size < MIN_RESUME_BYTES:
+        raise ProfileNotFoundError(
+            f"The resume at {path} is only {size} bytes - that is a placeholder, not a "
+            f"resume. Replace it with your real PDF (at least {MIN_RESUME_BYTES} bytes)."
+        )
+    with path.open("rb") as handle:
+        if not handle.read(len(PDF_MAGIC)).startswith(PDF_MAGIC):
+            raise ProfileNotFoundError(
+                f"The resume at {path} is not a PDF (no %PDF header)."
+            )
+    return path
+
+
+def profile_template() -> Profile:
+    """A profile skeleton with the values the operator must fill in."""
+    return Profile(
+        name="",
+        email="",
+        phone="",
+        resume_path=str(Path(os.path.expanduser("~/.config/indeed_scraper/resume.pdf"))),
+    )
+
+
 def load_profile(path: Path | None = None) -> Profile:
     """Load a Profile from a JSON file.
 
@@ -62,7 +101,9 @@ def load_profile(path: Path | None = None) -> Profile:
         raise ProfileNotFoundError(
             f"Invalid JSON in profile file {expanded}: {exc}"
         ) from exc
-    return Profile(**data)
+    profile = Profile(**data)
+    validate_resume(Path(profile.resume_path).expanduser())
+    return profile
 
 
 def save_profile(profile: Profile, path: Path | None = None) -> Path:
