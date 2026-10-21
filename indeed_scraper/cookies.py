@@ -27,9 +27,20 @@ SessionStatus = Literal["active", "expired", "revoked"]
 SaveSource = Literal["login", "refresh", "import"]
 
 SESSION_COOKIE_NAME = "SESS"
+# Indeed no longer issues the legacy "SESS" cookie to every client. Current
+# sessions are carried by the Passport bearer token (and its refresh token),
+# so a signed-in browser is recognised by either family.
+PASSPORT_COOKIE_NAMES: frozenset[str] = frozenset(
+    {
+        "__Secure-PassportAuthProxy-BearerToken",
+        "__Secure-PassportAuthProxy-RefreshToken",
+        "__Secure-PassportAuthProxy-OauthHMAC",
+    }
+)
+SESSION_COOKIE_NAMES: frozenset[str] = frozenset({SESSION_COOKIE_NAME}) | PASSPORT_COOKIE_NAMES
 AUTH_COOKIE_NAMES: frozenset[str] = frozenset(
     {"SESS", "CTK", "SUB", "LV", "LD", "UIMF", "IRS", "CSRF"}
-)
+) | PASSPORT_COOKIE_NAMES
 INDEED_DOMAIN_SUFFIX = "indeed.com"
 EXPIRY_SKEW_S = 120.0
 
@@ -91,7 +102,12 @@ class CookieSession(BaseModel):
         return next((c for c in self.cookies if c.name == name), None)
 
     def session_cookie(self) -> Cookie | None:
-        return self.cookie(SESSION_COOKIE_NAME)
+        """The cookie that proves a signed-in session (legacy SESS or Passport)."""
+        for name in sorted(SESSION_COOKIE_NAMES):
+            found = self.cookie(name)
+            if found is not None:
+                return found
+        return None
 
     def is_signed_in(self) -> bool:
         return self.session_cookie() is not None
@@ -230,7 +246,7 @@ class CookieStore:
         for line in lines:
             try:
                 events.append(json.loads(line))
-            except json.JSONDecodeError:  # noqa: PERF203 - tiny log, clarity over micro-optimisation
+            except json.JSONDecodeError:  # tiny log, clarity over micro-optimisation
                 continue
         return events
 

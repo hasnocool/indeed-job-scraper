@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Mapping
 
 from rich.console import Console
 from rich.panel import Panel
@@ -20,25 +21,44 @@ from .browser import (
     wait_for_challenge,
 )
 from .config import Config
-from .cookies import CookieSession, CookieStore, SaveSource, is_indeed_domain
+from .cookies import (
+    SESSION_COOKIE_NAMES,
+    CookieSession,
+    CookieStore,
+    SaveSource,
+    is_indeed_domain,
+)
 from .errors import ChallengeBlockedError, LoginTimeoutError, SessionMissingError
 
 
 def _session_cookie_names(cookies: tuple[object, ...]) -> set[str]:
+    """Names of Indeed-domain cookies in a Playwright cookie dump.
+
+    Playwright returns plain dicts, so both mappings and objects are accepted.
+    """
     names: set[str] = set()
     for cookie in cookies:
-        name = getattr(cookie, "name", None)
-        domain = getattr(cookie, "domain", "")
+        if isinstance(cookie, Mapping):
+            name = cookie.get("name")
+            domain = cookie.get("domain", "")
+        else:
+            name = getattr(cookie, "name", None)
+            domain = getattr(cookie, "domain", "")
         if isinstance(name, str) and isinstance(domain, str) and is_indeed_domain(domain):
             names.add(name)
     return names
 
 
 def has_sign_in_cookie(context: object) -> bool:
+    """True when the browser holds a cookie that proves a signed-in session.
+
+    Indeed stopped issuing the legacy "SESS" cookie; current sessions are
+    carried by the Passport bearer token, so both families are accepted.
+    """
     cookies = getattr(context, "cookies", None)
     if not callable(cookies):
         return False
-    return "SESS" in _session_cookie_names(tuple(cookies()))
+    return bool(_session_cookie_names(tuple(cookies())) & SESSION_COOKIE_NAMES)
 
 
 def sign_in_hint(console: Console, config: Config) -> None:
@@ -215,8 +235,10 @@ def verify_session(config: Config, store: CookieStore, console: Console) -> Cook
     """Open the browser and confirm Indeed still accepts the saved cookies."""
     session = store.require_current()
     if not session.is_signed_in():
-        store.mark(session, "expired", reason="SESS cookie missing")
-        raise SessionMissingError("Saved cookie list has no SESS cookie; sign in again.")
+        store.mark(session, "expired", reason="session cookie missing")
+        raise SessionMissingError(
+            "Saved cookie list has no session cookie (SESS or Passport token); sign in again."
+        )
     with open_context(config, session=session) as context:
         page = active_page(context)
         goto(page, INDEED_MY_JOBS, config)
