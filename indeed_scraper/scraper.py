@@ -51,6 +51,16 @@ _EXTRACT_JS = r"""(() => {
     if (!record[field]) record[field] = value;
     best.set(jk, record);
   };
+  // Posted age is a plain badge ("New", "3 days ago") in the current mosaic
+  // card layout; there is no job-age testid any more.
+  const AGE_RE = /^(just posted|new|today|yesterday|\d+\s+(second|minute|hour|day|week|month|year)s?\s+ago)$/i;
+  const findAge = (card) => {
+    for (const node of card.querySelectorAll('span, div, time')) {
+      const value = text(node);
+      if (value && value.length <= 20 && AGE_RE.test(value)) return value;
+    }
+    return '';
+  };
   for (const el of document.querySelectorAll('[data-jk]')) {
     const jk = el.getAttribute('data-jk');
     if (!jk) continue;
@@ -61,7 +71,7 @@ _EXTRACT_JS = r"""(() => {
     add(jk, 'location', pick(card, ['[data-testid="text-location"]', '.companyLocation', '[data-testid="job-location"]']));
     add(jk, 'salary', pick(card, ['li.salary-snippet-container', '.salary-snippet-container', '.salary-snippet', '.estimated-salary', '[data-testid="salary-snippet"]']));
     add(jk, 'schedule', pick(card, ['li[data-testid="attribute_snippet_testid"]:not(.salary-snippet-container)', '.jobTitleSnippet']));
-    add(jk, 'posted', pick(card, ['[data-testid="job-age"]', 'span.date', '.date', '[data-testid="myJobsStateDate"]']));
+    add(jk, 'posted', pick(card, ['[data-testid="job-age"]', 'span.date', '.date', '[data-testid="myJobsStateDate"]']) || findAge(card));
     add(jk, 'snippet', pick(card, ['.job-snippet', '[data-testid="belowJobSnippet"]', '.summary']).slice(0, 400));
     add(jk, 'url', 'https://www.indeed.com/viewjob?jk=' + jk);
   }
