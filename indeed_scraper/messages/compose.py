@@ -23,14 +23,20 @@ MessageKind = Literal["offer", "interview", "question", "general", "unknown"]
 
 #: Phrases that indicate an offer or another binding commitment.
 OFFER_PATTERNS = (
-    r"\boffer\b",
+    r"\boffer(?:s|ed|ing)?\b",
+    r"\bhire(?:ing|d|s)?\b",
+    r"\baccept(?:ance)? (?:of|the|our|this|an|it)\b",
+    r"\baccept(?:ance)? of\b",
+    r"\bjoining us\b",
+    r"\bjoin (?:us|our team)\b",
     r"\bplease (?:confirm|sign)\b",
-    r"\bwe(?:'d| would) like to (?:offer|hire)\b",
-    r"\bformal (?:offer|appointment)\b",
+    r"\bformal (?:offer|appointment|contract)\b",
+    r"\bemployment agreement\b",
     r"\bstart (?:date|your employment)\b",
-    r"\bjoin our team\b",
+    r"\bstarting (?:on|from|january|february|march|april|may|june|july|august|september|october|november|december)\b",
     r"\bsalary of\b",
-    r"\bcompensation package\b",
+    r"\bcompensation (?:package|offer)\b",
+    r"\bcongratulations\b",
 )
 
 #: Phrases that indicate an interview or scheduling request.
