@@ -1,0 +1,223 @@
+{
+  "meta": {
+    "query": "sponsorship",
+    "location": "Chicago, IL",
+    "pages_fetched": 1,
+    "stopped_reason": "max_pages",
+    "total_jobs": 19,
+    "scraped_at": "2026-10-21T02:52:14.981108+00:00",
+    "generator": "indeed_scraper",
+    "signed_in": true
+  },
+  "jobs": [
+    {
+      "jk": "3baac9bff33db8ab",
+      "title": "Associate Product Sourcing & Sales Specialist (Mandarin - English Speaking)",
+      "company": "Conexus Food Solutions",
+      "location": "Chicago, IL 60638 (Clearing area)",
+      "salary": "$45,000 - $55,000 a year",
+      "schedule": "Full-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=3baac9bff33db8ab"
+    },
+    {
+      "jk": "aa68fa935b3cebd8",
+      "title": "Behavior Therapist, Pediatric ABA - Clinic-Based",
+      "company": "North Shore Pediatric Therapy",
+      "location": "Glenview, IL 60025",
+      "salary": "$19.00 - $22.50 an hour",
+      "schedule": "Full-time +1",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=aa68fa935b3cebd8"
+    },
+    {
+      "jk": "a25a42f45e81cc4a",
+      "title": "Senior Manager - Logistics & Optimization",
+      "company": "United Airlines",
+      "location": "Arlington Heights, IL 60004",
+      "salary": "$127,870 - $166,492 a year",
+      "schedule": "Full-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=a25a42f45e81cc4a"
+    },
+    {
+      "jk": "d1d7930470822eef",
+      "title": "Software Engineer",
+      "company": "John Deere",
+      "location": "Chicago, IL",
+      "salary": "$86,892 - $130,332 a year",
+      "schedule": "",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=d1d7930470822eef"
+    },
+    {
+      "jk": "942153dd6230e593",
+      "title": "WMS Consulting Senior Manager",
+      "company": "Deloitte",
+      "location": "Chicago, IL 60606 (The Loop area)",
+      "salary": "$171,600 - $338,300 a year",
+      "schedule": "Full-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=942153dd6230e593"
+    },
+    {
+      "jk": "d908957804ef576c",
+      "title": "Bilingual Branch Wholesale Product Specialist (Spanish)",
+      "company": "",
+      "location": "",
+      "salary": "From $18.75 an hour",
+      "schedule": "Full-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=d908957804ef576c"
+    },
+    {
+      "jk": "618461e4e977a26f",
+      "title": "Bilingual Retail Sales Associate",
+      "company": "",
+      "location": "",
+      "salary": "From $17.50 an hour",
+      "schedule": "Part-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=618461e4e977a26f"
+    },
+    {
+      "jk": "695a64ca488cd611",
+      "title": "Veteran Community Relations & Business Development Specialist",
+      "company": "",
+      "location": "",
+      "salary": "$50,000 - $60,000 a year",
+      "schedule": "Full-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=695a64ca488cd611"
+    },
+    {
+      "jk": "7d5317a67e8d5e75",
+      "title": "Functional SAP Account Receivable Senior Consultant",
+      "company": "Deloitte",
+      "location": "Chicago, IL 60606 (The Loop area)",
+      "salary": "$134,500 - $265,100 a year",
+      "schedule": "Full-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=7d5317a67e8d5e75"
+    },
+    {
+      "jk": "dd7ffb492c8e6e84",
+      "title": "SAP AP Functional Senior Consultant",
+      "company": "Deloitte",
+      "location": "Chicago, IL 60606 (The Loop area)",
+      "salary": "$110,700 - $218,300 a year",
+      "schedule": "Full-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=dd7ffb492c8e6e84"
+    },
+    {
+      "jk": "3209e9b3fbe0d661",
+      "title": "SAP BRIM - Senior Consultant",
+      "company": "Deloitte",
+      "location": "Chicago, IL 60606 (The Loop area)",
+      "salary": "$95,600 - $159,300 a year",
+      "schedule": "Full-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=3209e9b3fbe0d661"
+    },
+    {
+      "jk": "d2ee1036d8bf0170",
+      "title": "IDT Forward Deployed Engineer, Zora AI",
+      "company": "Deloitte",
+      "location": "Chicago, IL 60606 (The Loop area)",
+      "salary": "$159,100 - $224,100 a year",
+      "schedule": "Full-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=d2ee1036d8bf0170"
+    },
+    {
+      "jk": "9887d1710b6633a3",
+      "title": "OCDAO - Ascend Tech Data Leader (Senior Manager) - Innovation_Delivery_Transformation",
+      "company": "Deloitte",
+      "location": "Chicago, IL 60606 (The Loop area)",
+      "salary": "$171,600 - $338,300 a year",
+      "schedule": "Full-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=9887d1710b6633a3"
+    },
+    {
+      "jk": "fddf64057d37b213",
+      "title": "RIS Solution Advisory Associate Manager - Finance RP",
+      "company": "Accenture",
+      "location": "Hybrid work in Chicago, IL",
+      "salary": "$68,300 - $218,800 a year",
+      "schedule": "Full-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=fddf64057d37b213"
+    },
+    {
+      "jk": "25fe2f1d9e97066c",
+      "title": "Oracle EPM Delivery Lead/Solution Architect",
+      "company": "Accenture",
+      "location": "Chicago, IL",
+      "salary": "$122,700 - $302,400 a year",
+      "schedule": "Full-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=25fe2f1d9e97066c"
+    },
+    {
+      "jk": "9ac134b17141a89f",
+      "title": "SAP Analytics Cloud (SAC)/FP&A Senior Manager – High Tech",
+      "company": "Accenture",
+      "location": "Chicago, IL",
+      "salary": "$122,700 - $302,400 a year",
+      "schedule": "Full-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=9ac134b17141a89f"
+    },
+    {
+      "jk": "260133d4b39d5eef",
+      "title": "Enterprise Productivity & Performance Consultant",
+      "company": "Accenture",
+      "location": "Chicago, IL",
+      "salary": "$59,100 - $188,100 a year",
+      "schedule": "Full-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=260133d4b39d5eef"
+    },
+    {
+      "jk": "fedcba9876543210",
+      "title": "Enterprise Productivity & Performance Consultant",
+      "company": "Accenture",
+      "location": "Chicago, IL",
+      "salary": "$59,100 - $188,100 a year",
+      "schedule": "Full-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=fedcba9876543210"
+    },
+    {
+      "jk": "620613773f7a72b7",
+      "title": "Workday Financials Project Manager",
+      "company": "Accenture",
+      "location": "Chicago, IL",
+      "salary": "$87,400 - $266,300 a year",
+      "schedule": "Full-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=620613773f7a72b7"
+    }
+  ]
+}

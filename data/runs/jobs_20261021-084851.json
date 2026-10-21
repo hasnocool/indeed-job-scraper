@@ -1,0 +1,1247 @@
+{
+  "meta": {
+    "query": "(all jobs)",
+    "locations": [
+      "Ucluelet, BC",
+      "Tofino, BC",
+      "Port Alberni, BC"
+    ],
+    "pages_fetched": 9,
+    "stopped_reason": "Ucluelet, BC: max_pages, Tofino, BC: max_pages, Port Alberni, BC: max_pages",
+    "per_location": [
+      {
+        "location": "Ucluelet, BC",
+        "pages": 3,
+        "new_jobs": 47,
+        "stopped_reason": "max_pages"
+      },
+      {
+        "location": "Tofino, BC",
+        "pages": 3,
+        "new_jobs": 10,
+        "stopped_reason": "max_pages"
+      },
+      {
+        "location": "Port Alberni, BC",
+        "pages": 3,
+        "new_jobs": 14,
+        "stopped_reason": "max_pages"
+      }
+    ],
+    "total_jobs": 71,
+    "scraped_at": "2026-10-21T15:48:51.290211+00:00",
+    "generator": "indeed_scraper",
+    "fingerprint_version": 1,
+    "signed_in": true
+  },
+  "jobs": [
+    {
+      "jk": "9c6928193949b215",
+      "title": "Independent Sales Representative – AI Voice Technology Commission First, Then Salary Probation Perio",
+      "company": "Ethos Market Research",
+      "location": "Canada",
+      "salary": "",
+      "schedule": "Freelance",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=9c6928193949b215",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "1b07c62d063083b73cc6929a36e381fa5e8421035a227710da849ba894da9922",
+      "short_id": "1b07c62d0630"
+    },
+    {
+      "jk": "e11c30b3bc7680a8",
+      "title": "Inside Sales Representative (Automotive) Remote/ Représentant des ventes internes (secteur automobile) – Télétravail",
+      "company": "Concentrix",
+      "location": "British Columbia",
+      "salary": "$17–$20 an hour",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=e11c30b3bc7680a8",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "d0c880e812ef4c59d702be6a192c8c2c5735447400f55c1463370a054e98c0b8",
+      "short_id": "d0c880e812ef"
+    },
+    {
+      "jk": "2a2249f75129e5be",
+      "title": "Kitchen Exhaust Hood Cleaning Technician",
+      "company": "Hood Cleaners fo America",
+      "location": "British Columbia",
+      "salary": "From $18.25 an hour",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=2a2249f75129e5be",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "7fce9030180739e0099f536bcb81bbb9d508ffa05734cfe8a82e69f312dcfd48",
+      "short_id": "7fce90301807"
+    },
+    {
+      "jk": "0afe4b43835028b5",
+      "title": "Revit Technician",
+      "company": "Robert Blaney Design Inc.",
+      "location": "British Columbia",
+      "salary": "From $100,000 a year",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=0afe4b43835028b5",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "ed82913538511ce3b473ba2332eecb5786f77196613e940403cdf50e2e6ba159",
+      "short_id": "ed8291353851"
+    },
+    {
+      "jk": "f675a9d1be1c5cdf",
+      "title": "Construction Management Field Specialist - Track",
+      "company": "Metrolinx",
+      "location": "Canada",
+      "salary": "$93,798 a year",
+      "schedule": "Weekends as needed +2",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=f675a9d1be1c5cdf",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "8d13a910a0c30a39b54cfc655fd74b344e901349dee8def92445151ffcaa895d",
+      "short_id": "8d13a910a0c3"
+    },
+    {
+      "jk": "75727ab02989154c",
+      "title": "Physiotherapist 2",
+      "company": "Health PEI",
+      "location": "Canada",
+      "salary": "$39.93–$48.99 an hour",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=75727ab02989154c",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "c373eb1f476e003bafaf6ef6b46d1fa211dad1e33ef3b8f3469d3ab76a4271a8",
+      "short_id": "c373eb1f476e"
+    },
+    {
+      "jk": "2e9a5f1970add84f",
+      "title": "Occupational Therapist 2",
+      "company": "Health PEI",
+      "location": "Canada",
+      "salary": "$39.93–$48.99 an hour",
+      "schedule": "Weekends as needed +1",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=2e9a5f1970add84f",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "b4333e92763a3c9df3de4603a46bae77cccaa595e35dbad904c7ec196f02dcd4",
+      "short_id": "b4333e92763a"
+    },
+    {
+      "jk": "70020d8b7275f12a",
+      "title": "Food Expediter",
+      "company": "Black Rock Oceanfront Resort",
+      "location": "Ucluelet, BC",
+      "salary": "$18.25 an hour",
+      "schedule": "Weekends as needed +1",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=70020d8b7275f12a",
+      "matches": [
+        "Ucluelet, BC"
+      ],
+      "fingerprint": "084477ec7a8f2d84773880164edcc09ef8382d5e0454210666088a1978793465",
+      "short_id": "084477ec7a8f"
+    },
+    {
+      "jk": "2c16977e71a04e29",
+      "title": "Sous Chef",
+      "company": "Black Rock Oceanfront Resort",
+      "location": "Ucluelet, BC",
+      "salary": "$60,000–$75,000 a year",
+      "schedule": "Day shift",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=2c16977e71a04e29",
+      "matches": [
+        "Ucluelet, BC"
+      ],
+      "fingerprint": "b886a33a065a95837442a83fba3f5e3449794ed365684d236f3df39f851dd164",
+      "short_id": "b886a33a065a"
+    },
+    {
+      "jk": "18b1682e45d2e452",
+      "title": "Sr. Field Engineer - Island Generation (Campbell River)",
+      "company": "BC Hydro",
+      "location": "British Columbia",
+      "salary": "$109,700–$138,700 a year",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=18b1682e45d2e452",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "3889bfc9414d9830c61c64bd0533aac87e1901bd1b82ba8395926083c1522620",
+      "short_id": "3889bfc9414d"
+    },
+    {
+      "jk": "cdef0123456789ab",
+      "title": "Sr. Field Engineer - Island Generation (Campbell River)",
+      "company": "BC Hydro",
+      "location": "British Columbia",
+      "salary": "$109,700–$138,700 a year",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=cdef0123456789ab",
+      "matches": [
+        "Ucluelet, BC"
+      ],
+      "fingerprint": "3889bfc9414d9830c61c64bd0533aac87e1901bd1b82ba8395926083c1522620",
+      "short_id": "3889bfc9414d"
+    },
+    {
+      "jk": "a79e8b4b995dd29f",
+      "title": "Construction Contracts Specialist",
+      "company": "BC Hydro",
+      "location": "British Columbia",
+      "salary": "$131,100–$165,800 a year",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=a79e8b4b995dd29f",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "3af1d06a2a34aad4212a74c42c7635f25f112c5a6a2f972e618b531206055688",
+      "short_id": "3af1d06a2a34"
+    },
+    {
+      "jk": "30aa2902d8ae9cd8",
+      "title": "Independent Sales - Promotional Products & Apparel- Commission Based",
+      "company": "MK Digital",
+      "location": "British Columbia",
+      "salary": "$36,500–$156,700 a year",
+      "schedule": "Contract",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=30aa2902d8ae9cd8",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "af2bddedfaf46b361619b12afb6646dff979bcaa6f51dbef89f6fb3f39026d91",
+      "short_id": "af2bddedfaf4"
+    },
+    {
+      "jk": "ff3b6118abb08229",
+      "title": "Water Taxi Operator - Relocate to Port Hardy, BC",
+      "company": "K’awat’si Marine Services",
+      "location": "British Columbia",
+      "salary": "$27–$30 an hour",
+      "schedule": "Part-time",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=ff3b6118abb08229",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "059f310c85d7bbe1258c5b1b2937b9e316cc28d37f3feb0e824ad53c4ee9e4db",
+      "short_id": "059f310c85d7"
+    },
+    {
+      "jk": "4d27e672e75abd6f",
+      "title": "Registered Dental Hygienist – Relocate to Victoria, B.C(Housing assistance available)",
+      "company": "Signature Dental",
+      "location": "Canada",
+      "salary": "$57–$62 an hour",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=4d27e672e75abd6f",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "aa287df72bfdb6b2eb56d83992aa727ebd0bf2a72af84cac78243961d2c95206",
+      "short_id": "aa287df72bfd"
+    },
+    {
+      "jk": "83eeddd0d0b2b9d6",
+      "title": "Mortgage Broker",
+      "company": "Haystax Mortgage Professionals",
+      "location": "British Columbia",
+      "salary": "$1–$500,000 a year",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=83eeddd0d0b2b9d6",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "5cd678f18c654a632f93f5489176274eaecc8be9faf4051b9da950d7b4d307d7",
+      "short_id": "5cd678f18c65"
+    },
+    {
+      "jk": "fd96b109a0760287",
+      "title": "Farsi Interpreter – Remote (Canada) + Paid Training",
+      "company": "Kelly",
+      "location": "British Columbia",
+      "salary": "$18.50 an hour",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=fd96b109a0760287",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "aa24d4974496f14d125ef226b72a536b84daa1f27ce128f159b4e3fe72ddcd1c",
+      "short_id": "aa24d4974496"
+    },
+    {
+      "jk": "f49948f8ba6a1091",
+      "title": "Part-Time Math and Science Teacher",
+      "company": "iLearn Secondary School",
+      "location": "British Columbia",
+      "salary": "$29–$32 an hour",
+      "schedule": "Part-time",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=f49948f8ba6a1091",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "430f2aa4d9a52ab09e478c166a9808c96f6b3298345c792aca9becb559410d89",
+      "short_id": "430f2aa4d9a5"
+    },
+    {
+      "jk": "8b8807d75155c9b7",
+      "title": "Project Manager",
+      "company": "Infracon Construction Inc.",
+      "location": "British Columbia",
+      "salary": "$50–$62 an hour",
+      "schedule": "Overtime",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=8b8807d75155c9b7",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "f8521f844ba006598d02adeba8ef9663a7d7a6cc6aa0592d24f727e7e66d0cdb",
+      "short_id": "f8521f844ba0"
+    },
+    {
+      "jk": "38c66fd875ac17eb",
+      "title": "Innovation Strategy and Analyst Intern, Contract",
+      "company": "CWB Group - Industry Services",
+      "location": "Canada",
+      "salary": "$21.12–$26.67 an hour",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=38c66fd875ac17eb",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "02d70b1d41ca8e2fa2a6f1784614f80f6a5c89935bf9b9a54ba557c1cc5aaebd",
+      "short_id": "02d70b1d41ca"
+    },
+    {
+      "jk": "884c1a73aa8c6661",
+      "title": "Manager, Estimating",
+      "company": "The Sutherland Group of Companies",
+      "location": "British Columbia",
+      "salary": "$120,000–$160,000 a year",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=884c1a73aa8c6661",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "e2cb0d986c68f310c99bb1908a5aefe09ea8ed991a2e9ba9563d6e7bde40f571",
+      "short_id": "e2cb0d986c68"
+    },
+    {
+      "jk": "b97203ce7465d5d4",
+      "title": "Account Manager & Product Educator – British Columbia",
+      "company": "ITL Health",
+      "location": "British Columbia",
+      "salary": "$65,000–$75,000 a year",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=b97203ce7465d5d4",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "417ea84bf57340c1fce0343a8a108462198a4ee93a1a0eaf378150da85cf1145",
+      "short_id": "417ea84bf573"
+    },
+    {
+      "jk": "cccf2bd12efb1a52",
+      "title": "Event and Conference Services Manager, relocation to Victoria BC",
+      "company": "JRoss Hospitality Recruiters",
+      "location": "British Columbia",
+      "salary": "$75,000 a year",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=cccf2bd12efb1a52",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "15d7cd8d68b0622dfa13b751395137bf927344fb33d2e3579f9b80027c1d0191",
+      "short_id": "15d7cd8d68b0"
+    },
+    {
+      "jk": "e4f445273e00bda4",
+      "title": "Front Desk Clerk",
+      "company": "Hilton Grand Vacations",
+      "location": "Ucluelet, BC",
+      "salary": "$23 an hour",
+      "schedule": "",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=e4f445273e00bda4",
+      "matches": [
+        "Ucluelet, BC"
+      ],
+      "fingerprint": "dffeacc98abdfc07479f69eaf9d9a1b374acdc6171adef30d8a352dcba9bf024",
+      "short_id": "dffeacc98abd"
+    },
+    {
+      "jk": "d68e4353003e2f6c",
+      "title": "HVAC Technician (Refrigeration & Gas Techs)",
+      "company": "Abundant Air Inc.",
+      "location": "Canada",
+      "salary": "Up to $55 an hour",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=d68e4353003e2f6c",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "b5bf1b263113dd2c43db0357dd2366d55a65a06d5369cce4776c561de23d8c69",
+      "short_id": "b5bf1b263113"
+    },
+    {
+      "jk": "3d378d3d4005f16f",
+      "title": "Independent B2B Sales Representative (Commission Only) *** reside in BC & Quebec ***",
+      "company": "LiVAR Packaging Canada",
+      "location": "British Columbia",
+      "salary": "$20,000–$80,000 a year",
+      "schedule": "Contract",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=3d378d3d4005f16f",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "a83cc4fd1c9bbf57b0010d8986f20dff525acbb286d662b21687b67bb832b3ee",
+      "short_id": "a83cc4fd1c9b"
+    },
+    {
+      "jk": "440d55f54ca7370e",
+      "title": "Carpenter- 10+ years of experience - Relocate to Port Hardy, B.C",
+      "company": "k’awat’si Construction Company (KCC)",
+      "location": "Canada",
+      "salary": "$39–$41 an hour",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=440d55f54ca7370e",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "112a97034849eb2316a16541a422ad4911d96b0558f27fbc0db04edd56e30e1b",
+      "short_id": "112a97034849"
+    },
+    {
+      "jk": "26b897c8536e92ad",
+      "title": "Automotive Sales Manager (located in Calgary, AB)",
+      "company": "Northstar Auto Group",
+      "location": "Canada",
+      "salary": "Up to $150,000 a year",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=26b897c8536e92ad",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "89df4ef9e25679b82acc1452dd3d40e0750a4c16ad1140efa0073f3236c0f108",
+      "short_id": "89df4ef9e256"
+    },
+    {
+      "jk": "0f1e2d3c4b5a6978",
+      "title": "Automotive Sales Manager (located in Calgary, AB)",
+      "company": "Northstar Auto Group",
+      "location": "Tofino, BC",
+      "salary": "Up to $150,000 a year",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=0f1e2d3c4b5a6978",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC"
+      ],
+      "fingerprint": "35b9d249bad26e48a35f260352dc31d98153831b5790b2456b73f3eb5e4a529b",
+      "short_id": "35b9d249bad2"
+    },
+    {
+      "jk": "65c0c3f175f8cbfa",
+      "title": "Cuisinier - Cochon Dingue Grande Allée",
+      "company": "Cochon Dingue",
+      "location": "Canada",
+      "salary": "$19–$22 an hour",
+      "schedule": "Day shift",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=65c0c3f175f8cbfa",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "89e92f7e360e2a8e9fe0c00c2d8b231643d787e27bf7cc317060f0d2dce3f8ff",
+      "short_id": "89e92f7e360e"
+    },
+    {
+      "jk": "dad5158cab5687df",
+      "title": "Staff Pharmacist",
+      "company": "Medicine Shoppe",
+      "location": "British Columbia",
+      "salary": "$130,000–$180,000 a year",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=dad5158cab5687df",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "51e52c0126561dcfc88faec3510c891c019e6564a1a1535d3903eead38e4c602",
+      "short_id": "51e52c012656"
+    },
+    {
+      "jk": "0fb4bfc9cc74af1b",
+      "title": "Outbound Account Executive – TELUS Business Solutions",
+      "company": "EPIC Wireless Inc.",
+      "location": "British Columbia",
+      "salary": "$40,040–$160,040 a year",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=0fb4bfc9cc74af1b",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "485d4ffa0b1734c455ca2851ce2448ceb258cd7bcf7c9cbeace197d9e44e438a",
+      "short_id": "485d4ffa0b17"
+    },
+    {
+      "jk": "54655f750c2d94ac",
+      "title": "Senior Geotechnical Engineer - British Columbia",
+      "company": "Clifton",
+      "location": "British Columbia",
+      "salary": "$130,000–$200,000 a year",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=54655f750c2d94ac",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "0bfc61f162e9e6332634d279a60fed9325a0918a81e312c57d71d50f70078fd4",
+      "short_id": "0bfc61f162e9"
+    },
+    {
+      "jk": "52384966bd618a1f",
+      "title": "Pipe Foreman",
+      "company": "Infracon Construction Inc.",
+      "location": "British Columbia",
+      "salary": "$39–$45 an hour",
+      "schedule": "Overtime",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=52384966bd618a1f",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "8cc0bff49f0525d63f07142185e0f7b3fed45fcf87399bbde4971a05897a81a5",
+      "short_id": "8cc0bff49f05"
+    },
+    {
+      "jk": "fe964b3709eafb22",
+      "title": "Thai Interpreter – Remote (Canada) + Paid Training",
+      "company": "Kelly",
+      "location": "British Columbia",
+      "salary": "$18.50 an hour",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=fe964b3709eafb22",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "7d9cc95fa8c08d5624c8fbbbaf37a83432a4ead784ce54f7a5e753f87b239934",
+      "short_id": "7d9cc95fa8c0"
+    },
+    {
+      "jk": "5352014110a449d0",
+      "title": "Civil Construction Superintendent",
+      "company": "Infracon Construction Inc.",
+      "location": "British Columbia",
+      "salary": "$53–$65 an hour",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=5352014110a449d0",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "d0a6a08e95bb00c1ed515bdeee2eda8266dbd23205412821de3e1d822334293f",
+      "short_id": "d0a6a08e95bb"
+    },
+    {
+      "jk": "118b68ce5b46d490",
+      "title": "Travel Speech Pathologist and Audiologist - Nunavut",
+      "company": "Augury Healthcare",
+      "location": "Canada",
+      "salary": "$100–$120 an hour",
+      "schedule": "Contract",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=118b68ce5b46d490",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC"
+      ],
+      "fingerprint": "ab08071bdbd827f7928cf3e55d79320004a1472dc3043348ed1fbd77f5634991",
+      "short_id": "ab08071bdbd8"
+    },
+    {
+      "jk": "ee32bd28659011be",
+      "title": "Travel Respiratory Therapist - Nunavut",
+      "company": "Augury Healthcare",
+      "location": "Canada",
+      "salary": "$95–$105 an hour",
+      "schedule": "Contract",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=ee32bd28659011be",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "1f254e8f743701715ad84e505d008bde754270e9634f02746184d8bc7b4d8609",
+      "short_id": "1f254e8f7437"
+    },
+    {
+      "jk": "727c7b341138bde4",
+      "title": "Program Coordinator (Contract) / coordinateur de programme (contrat)",
+      "company": "BioScript Solutions",
+      "location": "Canada",
+      "salary": "",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=727c7b341138bde4",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC"
+      ],
+      "fingerprint": "458de4bf5a772c1ecb0c2573cd372d8d2621c4664d9309b4c0662dd120ff8aa6",
+      "short_id": "458de4bf5a77"
+    },
+    {
+      "jk": "dd9a71970c5d2c77",
+      "title": "Cook/Chef",
+      "company": "Augury Healthcare",
+      "location": "British Columbia",
+      "salary": "$23–$26 an hour",
+      "schedule": "Contract",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=dd9a71970c5d2c77",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC"
+      ],
+      "fingerprint": "d5b767dfc40676554ed49cc473e8b5ea93dcd0e5be3363c1a77061c4a0cc6fa8",
+      "short_id": "d5b767dfc406"
+    },
+    {
+      "jk": "123456789abcdef0",
+      "title": "Farsi Interpreter – Remote (Canada) + Paid Training",
+      "company": "Augury Healthcare",
+      "location": "British Columbia",
+      "salary": "$23–$26 an hour",
+      "schedule": "Contract",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=123456789abcdef0",
+      "matches": [
+        "Ucluelet, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "0c369d0de50a9ffbbfb60b953d62e0b8146af4a795f5e30c012b73cb6ff01813",
+      "short_id": "0c369d0de50a"
+    },
+    {
+      "jk": "d78f9486c31557f1",
+      "title": "Travel Physiotherapist - Nunavut",
+      "company": "Augury Healthcare",
+      "location": "Canada",
+      "salary": "$100–$110 an hour",
+      "schedule": "Contract",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=d78f9486c31557f1",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC"
+      ],
+      "fingerprint": "854438852e4ba2e3365cd8faf634374d8c02e3787f4fc9156046c0b6a61c3d18",
+      "short_id": "854438852e4b"
+    },
+    {
+      "jk": "6554cc887086dcb5",
+      "title": "Travel Occupational Therapist - Nunavut",
+      "company": "Augury Healthcare",
+      "location": "Canada",
+      "salary": "$105–$115 an hour",
+      "schedule": "Contract",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=6554cc887086dcb5",
+      "matches": [
+        "Ucluelet, BC",
+        "Tofino, BC"
+      ],
+      "fingerprint": "698fda255cf09ab7b97c78426742ec3c50906eaa8100aaef0e520b795b5ef1cb",
+      "short_id": "698fda255cf0"
+    },
+    {
+      "jk": "ef5b439fe71328ae",
+      "title": "Lawyer Associate",
+      "company": "Keystone Legal",
+      "location": "Canada",
+      "salary": "$90,000–$150,000 a year",
+      "schedule": "Contract",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=ef5b439fe71328ae",
+      "matches": [
+        "Ucluelet, BC"
+      ],
+      "fingerprint": "681b01d5fdd9621e8005ac73d44998875f78b7d6112d5aa2d0f68c427ef17879",
+      "short_id": "681b01d5fdd9"
+    },
+    {
+      "jk": "3b1b91b6e126f450",
+      "title": "Electronic Technologists - $61.66/hr in Prince Rupert!",
+      "company": "Prince Rupert Grain",
+      "location": "British Columbia",
+      "salary": "$61.66 an hour",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=3b1b91b6e126f450",
+      "matches": [
+        "Ucluelet, BC"
+      ],
+      "fingerprint": "ef5eb4632be4c4bdaa0ce209d0f4697aff6653ab67134704914f2f8644beada9",
+      "short_id": "ef5eb4632be4"
+    },
+    {
+      "jk": "5cee0f7fed40e861",
+      "title": "Senior Commissioning Engineer",
+      "company": "BC Hydro",
+      "location": "British Columbia",
+      "salary": "$109,700–$138,700 a year",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=5cee0f7fed40e861",
+      "matches": [
+        "Ucluelet, BC"
+      ],
+      "fingerprint": "0c4f8535ccdb57895540301fa73a2d911139acbd6e903ae5387ca9af31d76fbb",
+      "short_id": "0c4f8535ccdb"
+    },
+    {
+      "jk": "c6ce63e1733e81a8",
+      "title": "Program Performance Manager - Western Canada",
+      "company": "Variablegrid Adaptive Power Inc.",
+      "location": "British Columbia",
+      "salary": "$90,000–$130,000 a year",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=c6ce63e1733e81a8",
+      "matches": [
+        "Ucluelet, BC"
+      ],
+      "fingerprint": "663352a9b37379c15580e1605d0496dd28fa9ea4ce3457ebd7620cbd2c736059",
+      "short_id": "663352a9b373"
+    },
+    {
+      "jk": "2c3498b59322b843",
+      "title": "Registered Nurse",
+      "company": "Island Health",
+      "location": "Tofino, BC",
+      "salary": "$41.42–$59.52 an hour",
+      "schedule": "",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=2c3498b59322b843",
+      "matches": [
+        "Tofino, BC"
+      ],
+      "fingerprint": "37110d4373b5e1d8b2f39daa1ae990d6f7df616943b83dd5bc8d86f60fe845f1",
+      "short_id": "37110d4373b5"
+    },
+    {
+      "jk": "890abcdef0123456",
+      "title": "Physiotherapist 2",
+      "company": "Health PEI",
+      "location": "Canada",
+      "salary": "$39.93–$48.99 an hour",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=890abcdef0123456",
+      "matches": [
+        "Tofino, BC"
+      ],
+      "fingerprint": "c373eb1f476e003bafaf6ef6b46d1fa211dad1e33ef3b8f3469d3ab76a4271a8",
+      "short_id": "c373eb1f476e"
+    },
+    {
+      "jk": "25e9f0c84e89c8d6",
+      "title": "General Manager",
+      "company": "Ombre Restaurant",
+      "location": "Tofino, BC",
+      "salary": "$60,000–$90,000 a year",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=25e9f0c84e89c8d6",
+      "matches": [
+        "Tofino, BC"
+      ],
+      "fingerprint": "359bae1ce67a9f7b231d9f64a5387f22bbc0918199417911a36c23da9dba0dd6",
+      "short_id": "359bae1ce67a"
+    },
+    {
+      "jk": "7cec24578ab04230",
+      "title": "Lead Deckhand - Tug and Barge - Relocate to Port hardy, B.C",
+      "company": "K’awat’si Marine Services",
+      "location": "British Columbia",
+      "salary": "$375–$500 a day",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=7cec24578ab04230",
+      "matches": [
+        "Tofino, BC",
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "0ad6417f3a5627a153fd975e73dfec3ddd3f7a9c6fa3b2b374adc027a9577058",
+      "short_id": "0ad6417f3a56"
+    },
+    {
+      "jk": "a1b2c3d4e5f67890",
+      "title": "Registered Dental Hygienist – Relocate to Victoria, B.C(Housing assistance available)",
+      "company": "Signature Dental",
+      "location": "Canada",
+      "salary": "$57–$62 an hour",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=a1b2c3d4e5f67890",
+      "matches": [
+        "Tofino, BC"
+      ],
+      "fingerprint": "aa287df72bfdb6b2eb56d83992aa727ebd0bf2a72af84cac78243961d2c95206",
+      "short_id": "aa287df72bfd"
+    },
+    {
+      "jk": "87f50b68416c878c",
+      "title": "Assistant Manager (Full Time)",
+      "company": "Tofino Fishing and Trading",
+      "location": "Tofino, BC",
+      "salary": "$50,000–$70,000 a year",
+      "schedule": "",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=87f50b68416c878c",
+      "matches": [
+        "Tofino, BC"
+      ],
+      "fingerprint": "64575ddb6e09d2b2abf5e78906391f9334705ab7f64c5dea07e4eca1a8381da7",
+      "short_id": "64575ddb6e09"
+    },
+    {
+      "jk": "105af308c109164e",
+      "title": "Houseperson/Housekeeper",
+      "company": "Cox Bay Beach Resort",
+      "location": "Tofino, BC",
+      "salary": "From $18.50 an hour",
+      "schedule": "",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=105af308c109164e",
+      "matches": [
+        "Tofino, BC"
+      ],
+      "fingerprint": "5085d8d969d3a309cc8a76bac2b16e819aa4ba3910b9d14cfcd3407a759a3295",
+      "short_id": "5085d8d969d3"
+    },
+    {
+      "jk": "3b79f7339f61fe99",
+      "title": "Housekeeping Cleaner",
+      "company": "Blue Crush Concierge",
+      "location": "Tofino, BC",
+      "salary": "$23–$25 an hour",
+      "schedule": "",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=3b79f7339f61fe99",
+      "matches": [
+        "Tofino, BC"
+      ],
+      "fingerprint": "4972e4b51087e1a9a4038569fe86bab06d1c6158d23b58342862778fa1397f26",
+      "short_id": "4972e4b51087"
+    },
+    {
+      "jk": "3c95952aa1bd16c8",
+      "title": "Housekeeping Supervisor",
+      "company": "Blue Crush Concierge",
+      "location": "Tofino, BC",
+      "salary": "$23–$25 an hour",
+      "schedule": "",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=3c95952aa1bd16c8",
+      "matches": [
+        "Tofino, BC"
+      ],
+      "fingerprint": "3e95dfefd8c7883629f2cff092b8d2a177b25dbadd91946770f28315e95cad96",
+      "short_id": "3e95dfefd8c7"
+    },
+    {
+      "jk": "134b499ebf7fff62",
+      "title": "Public Space Attendant",
+      "company": "LONG BEACH LODGE RESORT",
+      "location": "Tofino, BC",
+      "salary": "$21 an hour",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=134b499ebf7fff62",
+      "matches": [
+        "Tofino, BC"
+      ],
+      "fingerprint": "46f4ad8821725c5670d39baba843536921d03ef9c7183a1df715ad60b1af880b",
+      "short_id": "46f4ad882172"
+    },
+    {
+      "jk": "738cce6a89c715dd",
+      "title": "Computed Tomography (CT) & Medical Imaging Technologist",
+      "company": "Island Health",
+      "location": "Port Alberni, BC V9Y 4S1",
+      "salary": "$43.24–$54.01 an hour",
+      "schedule": "Weekends as needed +2",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=738cce6a89c715dd",
+      "matches": [
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "d59a683cacc8cccf25f6fecfa3dcd91d6f206cab48a28400439ecca9228d7333",
+      "short_id": "d59a683cacc8"
+    },
+    {
+      "jk": "ce40b79bafb656e0",
+      "title": "Coordinator",
+      "company": "Island Health",
+      "location": "Port Alberni, BC V9Y 3E3",
+      "salary": "$50.10–$62.58 an hour",
+      "schedule": "",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=ce40b79bafb656e0",
+      "matches": [
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "00ad2d34d2ed3ee9cb9717e940fcfef6199ec3e0f51a0c11216543710c9640e9",
+      "short_id": "00ad2d34d2ed"
+    },
+    {
+      "jk": "6ab3337f9f859089",
+      "title": "Aide pédagogique spécialisé·e - Orthophonie (4.00 hrs/sem)",
+      "company": "Conseil scolaire francophone de la...",
+      "location": "Port Alberni, BC V9Y 5Y6",
+      "salary": "$34.05 an hour",
+      "schedule": "Part-time +1",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=6ab3337f9f859089",
+      "matches": [
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "87c960b5dfb6fd9d63bc3417769021abdeb3ffb58a89cc74ef2a35800ca1ccc4",
+      "short_id": "87c960b5dfb6"
+    },
+    {
+      "jk": "8bff511cbd90737a",
+      "title": "Aide pédagogique (10.00 hrs/sem)",
+      "company": "Conseil scolaire francophone de la...",
+      "location": "Port Alberni, BC V9Y 5Y6",
+      "salary": "$31 an hour",
+      "schedule": "",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=8bff511cbd90737a",
+      "matches": [
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "222d147a252979b93046b9187691ded434ab9613e5f38d4111845716d9492fb1",
+      "short_id": "222d147a2529"
+    },
+    {
+      "jk": "9843ef3425277f86",
+      "title": "Surveillance des élèves (5.00 hrs/sem)",
+      "company": "Conseil scolaire francophone de la...",
+      "location": "Port Alberni, BC V9Y 5Y6",
+      "salary": "$29.43 an hour",
+      "schedule": "",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=9843ef3425277f86",
+      "matches": [
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "54093aff5d527877ffdb9a7d3b8796cae61a58bdffe951d7268c72eb9cf2eb76",
+      "short_id": "54093aff5d52"
+    },
+    {
+      "jk": "8ba6466ed414a962",
+      "title": "Line Cook",
+      "company": "Wildflower Cafe",
+      "location": "Port Alberni, BC V9Y 1V5",
+      "salary": "$19–$22 an hour",
+      "schedule": "Overtime",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=8ba6466ed414a962",
+      "matches": [
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "b3b89ceb89c8d255223b2764d47afd9e4442f553fef3d7054b4224c88408e847",
+      "short_id": "b3b89ceb89c8"
+    },
+    {
+      "jk": "3f35b10b5a87badf",
+      "title": "Barista",
+      "company": "Wildflower Cafe",
+      "location": "Port Alberni, BC V9Y 1V5",
+      "salary": "$19–$22 an hour",
+      "schedule": "Overtime",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=3f35b10b5a87badf",
+      "matches": [
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "1c2713eb5db0b2935e5160b4b187d45f26992df09fbbaee2142b010fed0b1974",
+      "short_id": "1c2713eb5db0"
+    },
+    {
+      "jk": "abcdef0123456789",
+      "title": "Revit Technician",
+      "company": "Robert Blaney Design Inc.",
+      "location": "British Columbia",
+      "salary": "From $100,000 a year",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=abcdef0123456789",
+      "matches": [
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "ed82913538511ce3b473ba2332eecb5786f77196613e940403cdf50e2e6ba159",
+      "short_id": "ed8291353851"
+    },
+    {
+      "jk": "c5092148d4deb04c",
+      "title": "Dietary Server",
+      "company": "Timberline",
+      "location": "Port Alberni, BC",
+      "salary": "$20.01 an hour",
+      "schedule": "",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=c5092148d4deb04c",
+      "matches": [
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "3a87b393a8ceb51745de4094277a394616bcc129bb83d279878c5e07ee9261ac",
+      "short_id": "3a87b393a8ce"
+    },
+    {
+      "jk": "fddc06098738f3df",
+      "title": "Aide pédagogique (10.00 hrs/sem)",
+      "company": "des Grands-cèdres",
+      "location": "Port Alberni, BC V9Y 5Y6",
+      "salary": "$31 an hour",
+      "schedule": "Part-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=fddc06098738f3df",
+      "matches": [
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "d07fc7a4769680ec8aeb21827f8c132b6ff55482d47406b043beb37d6ab2da0d",
+      "short_id": "d07fc7a47696"
+    },
+    {
+      "jk": "a67b0c0df6f458aa",
+      "title": "Surveillance des élèves (5.00 hrs/sem)",
+      "company": "des Grands-cèdres",
+      "location": "Port Alberni, BC V9Y 5Y6",
+      "salary": "$29.43 an hour",
+      "schedule": "Part-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=a67b0c0df6f458aa",
+      "matches": [
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "928bcfe14fa01906e344680af427bb42d88c92da0eb2489e57d5fe315472448f",
+      "short_id": "928bcfe14fa0"
+    },
+    {
+      "jk": "a5240063bd6f8ac7",
+      "title": "Aide pédagogique spécialisé·e - Orthophonie (4.00 hrs/sem)",
+      "company": "des Grands-cèdres",
+      "location": "Port Alberni, BC V9Y 5Y6",
+      "salary": "$34.05 an hour",
+      "schedule": "Part-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=a5240063bd6f8ac7",
+      "matches": [
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "5f42a80816fca14cd8ee6ff26bea0cc8f03c9384cf15bd31cec4a6d57a022b64",
+      "short_id": "5f42a80816fc"
+    },
+    {
+      "jk": "456789abcdef0123",
+      "title": "Aide pédagogique spécialisé·e - Orthophonie (4.00 hrs/sem)",
+      "company": "des Grands-cèdres",
+      "location": "Port Alberni, BC V9Y 5Y6",
+      "salary": "$34.05 an hour",
+      "schedule": "Part-time",
+      "posted": "",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=456789abcdef0123",
+      "matches": [
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "5f42a80816fca14cd8ee6ff26bea0cc8f03c9384cf15bd31cec4a6d57a022b64",
+      "short_id": "5f42a80816fc"
+    },
+    {
+      "jk": "4aa7fd8d57856b59",
+      "title": "RN 1:1",
+      "company": "Bayshore HealthCare",
+      "location": "Port Alberni, BC",
+      "salary": "$32.14–$53.19 an hour",
+      "schedule": "Casual",
+      "posted": "New",
+      "snippet": "",
+      "url": "https://www.indeed.com/viewjob?jk=4aa7fd8d57856b59",
+      "matches": [
+        "Port Alberni, BC"
+      ],
+      "fingerprint": "a52787b2bbe58e6fbcce1bbcf33e8e36029fb3870295932c0c3b482455b8bdb4",
+      "short_id": "a52787b2bbe5"
+    }
+  ]
+}

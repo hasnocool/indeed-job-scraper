@@ -1,7 +1,11 @@
 # scraper state: browser profile, cookie lists, outputs
 .indeed-state/
-# persistent data workspace (cookies and profiles are secrets; outputs are regenerable)
-data/
+# persistent data workspace: session cookies and the browser profile are
+# secrets and must never be published; the scrape history and the organized
+# master list are versioned so the mirror keeps a second copy.
+data/*
+!data/runs/
+!data/master/
 # tool artifacts
 .graphflow/
 graphflow-out/

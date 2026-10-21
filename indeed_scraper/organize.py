@@ -108,14 +108,21 @@ def replay(run_files: list[Path]) -> dict[str, dict]:
                 }
             else:
                 state = jk_state[jk]
-                # Merge the job: keep fullest fields
+                # Merge the job: keep fullest fields for ALL fields
                 existing_job = state["job"]
                 updates: dict[str, str] = {}
-                for field in ("title", "company", "location", "salary", "schedule"):
+                # All fields that can be merged by length
+                for field in ("title", "company", "location", "salary", "schedule", "posted", "snippet", "url"):
                     current = str(getattr(existing_job, field))
                     candidate = str(job_model.__getattribute__(field))
                     if len(candidate) > len(current):
                         updates[field] = candidate
+                # Union matches (preserve order, dedupe)
+                existing_matches = list(existing_job.matches)
+                incoming_matches = list(job_model.matches)
+                all_matches = existing_matches + [m for m in incoming_matches if m not in existing_matches]
+                if all_matches != existing_matches:
+                    updates["matches"] = tuple(all_matches)
                 if updates:
                     existing_job = existing_job.model_copy(update=updates)
                 state["job"] = existing_job
