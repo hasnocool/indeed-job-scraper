@@ -143,9 +143,20 @@ def records_to_csv(records: Sequence[Mapping[str, Any]], path: Path) -> Path:
 
 
 def jobs_to_csv(jobs: Sequence[Job], path: Path) -> Path:
-    dicts = [job.model_dump() for job in jobs]
-    # Ensure new dedup columns are present in each dict
-    for d in dicts:
-        d.setdefault("Job ID", d.get("short_id", ""))
-        d.setdefault("Fingerprint", d.get("fingerprint", ""))
+    """Write one run's jobs to CSV, including their content fingerprints.
+
+    The fingerprint is derived here rather than read from the record: a Job
+    model carries no fingerprint field, so the "Job ID" and "Fingerprint"
+    columns would otherwise always be blank.
+    """
+    dicts: list[dict[str, Any]] = []
+    for job in jobs:
+        fingerprint = job_fingerprint(job)
+        dicts.append(
+            {
+                **job.model_dump(),
+                "Job ID": short_id(fingerprint),
+                "Fingerprint": fingerprint,
+            }
+        )
     return records_to_csv(dicts, path)

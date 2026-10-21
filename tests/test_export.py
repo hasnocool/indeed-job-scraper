@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 
@@ -25,6 +26,30 @@ def test_jobs_to_csv_writes_all_columns(tmp_path: Path) -> None:
     assert header.split(",") == list(CSV_FIELDS)
     assert "Data Engineer" in row
     assert "abc123" in row
+
+
+def test_jobs_to_csv_populates_fingerprint_columns(tmp_path: Path) -> None:
+    """A single run's CSV must carry the job's content fingerprint.
+
+    The Job model has no fingerprint field, so the value has to be computed
+    here; reading it from the record left the columns permanently blank.
+    """
+    from indeed_scraper.dedupe import job_fingerprint, short_id
+
+    job = Job(
+        jk="abc123",
+        title="Data Engineer",
+        company="Acme",
+        location="Chicago, IL",
+        salary="$100,000 a year",
+    )
+    path = jobs_to_csv([job], tmp_path / "jobs.csv")
+    with path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    fingerprint = job_fingerprint(job)
+    assert rows[0]["Job ID"] == short_id(fingerprint)
+    assert rows[0]["Fingerprint"] == fingerprint
+    assert rows[0]["Job ID"] != ""
 
 
 def test_normalize_record_accepts_legacy_keys() -> None:
