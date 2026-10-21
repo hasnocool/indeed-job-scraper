@@ -81,6 +81,69 @@ class ReplyPlan:
     reason: str = ""
 
 
+#: A SECOND, independent detector for binding language. The offer patterns
+#: above classify a message; these say "this needs a human" whatever the
+#: message turned out to be about. A contract request that happens not to
+#: look like an offer still reaches the operator.
+BINDING_PATTERNS = (
+    r"\bcountersign\b",
+    r"\bemployment agreement\b",
+    r"\bcontract\b",
+    r"\bsign(?:ed|ature|ing)?\b",
+    r"\bsignature\b",
+    r"\boffer letter\b",
+    r"\bterms and conditions\b",
+    r"\baccept the terms\b",
+    r"\btax form\b",
+    r"\bnon[- ]?disclosure\b",
+    r"\bwork permit\b",
+    r"\bbanking details\b",
+    r"\bSIN\b",
+    r"\bstart date\b",
+    r"\bjoining date\b",
+)
+
+_COMPILED_BINDING = [re.compile(p, re.IGNORECASE) for p in BINDING_PATTERNS]
+
+
+def is_binding(text: str) -> bool:
+    """True when the message contains binding or contractual language.
+
+    This is deliberately independent of :func:`classify`: the classifier
+    decides what to SAY, this decides whether a HUMAN must look first.
+    """
+    if not text or not text.strip():
+        return False
+    return any(pattern.search(text) for pattern in _COMPILED_BINDING)
+
+
+def redact_operator(body: str, profile: Profile) -> str:
+    """Remove the operator's own details from a message body.
+
+    The ledger is an audit trail of what was said, not a second copy of the
+    profile: the operator's name, email and phone live in the 0600 profile
+    only. The structure of the reply is preserved.
+    """
+    if not body:
+        return body
+    redacted = body
+    values: list[str] = []
+    if profile.email:
+        values.append(profile.email)
+    if profile.phone:
+        values.append(profile.phone)
+    name = profile.name.strip()
+    if name:
+        values.append(name)
+        parts = [part for part in name.split() if part]
+        if len(parts) > 1:
+            values.append(parts[0])
+    for value in sorted(values, key=len, reverse=True):
+        if value:
+            redacted = redacted.replace(value, "[operator]")
+    return redacted
+
+
 def classify(text: str) -> MessageKind:
     """Classify an incoming message."""
     if not text.strip():
@@ -142,6 +205,7 @@ def build_reply(profile: Profile, incoming: str, company: str = "") -> ReplyPlan
     commitment, and the reply is never sent unattended by this function.
     """
     kind = classify(incoming)
+    binding = is_binding(incoming)
     role = _role_phrase(company)
     salutation = f"Hello{',' if not profile.name else ' ' + profile.name.split()[0]},"
 
@@ -164,7 +228,8 @@ def build_reply(profile: Profile, incoming: str, company: str = "") -> ReplyPlan
                 f"I am interested and available - {_availability(profile)}. "
                 "Please let me know what times work for you."
             ),
-            requires_approval=False,
+                requires_approval=binding,
+                reason=("the message contains binding or contractual language" if binding else ""),
         )
 
     if kind == "question":
@@ -173,7 +238,8 @@ def build_reply(profile: Profile, incoming: str, company: str = "") -> ReplyPlan
             return ReplyPlan(
                 kind=kind,
                 body=f"{salutation}\n\n{answer}\n\nLet me know if you need anything else from me.",
-                requires_approval=False,
+                requires_approval=binding,
+                reason=("the message contains binding or contractual language" if binding else ""),
             )
         return ReplyPlan(
             kind=kind,
@@ -191,5 +257,6 @@ def build_reply(profile: Profile, incoming: str, company: str = "") -> ReplyPlan
             f"{salutation}\n\nThank you for reaching out about {role}. "
             "I am interested and would be happy to talk. Please let me know the next steps."
         ),
-        requires_approval=False,
+        requires_approval=binding,
+        reason=("the message contains binding or contractual language" if binding else ""),
     )

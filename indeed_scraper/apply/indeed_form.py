@@ -10,13 +10,13 @@ rather than inventing one.
 
 from __future__ import annotations
 
-import os
+from pathlib import Path
 
 from playwright.sync_api import Page
 
 from ..browser import challenge_kind, challenge_label
-from .exceptions import FieldMissingError
-from .profile import Profile
+from .exceptions import FieldMissingError, ProfileNotFoundError
+from .profile import Profile, validate_resume
 from .selectors import (
     APPLY_BUTTON_SELECTORS,
     FIELD_SELECTORS,
@@ -80,8 +80,12 @@ def fill_indeed_form(page: Page, profile: Profile, draft: dict | None = None) ->
     from_path = profile.resume_path
     job_url = page.url
 
-    if not os.path.isfile(from_path):
-        raise FieldMissingError(f"resume: {from_path}", page.url)
+    # The resume is the one file that is UPLOADED to an employer, so this is
+    # where it must be a real document: a placeholder would be sent to them.
+    try:
+        validate_resume(Path(from_path).expanduser())
+    except ProfileNotFoundError as error:
+        raise FieldMissingError(f"resume: {error}", page.url) from error
 
     if draft is None:
         draft = {}

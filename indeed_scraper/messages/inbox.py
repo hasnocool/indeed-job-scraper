@@ -133,6 +133,28 @@ def list_conversations(page: Any) -> list[Conversation]:
     return conversations
 
 
+def find_row(page: Any, conversation: Conversation) -> int | None:
+    """Find the row of a conversation in the CURRENT inbox list.
+
+    The inbox is a virtualised listbox: a new recruiter message shifts the
+    rows, so an index captured earlier can point at a different thread. The
+    row is therefore located by its CONTENT (the preview text, or the
+    participant name), not by a stale position. Returns None when the
+    conversation is no longer listed.
+    """
+    conversations = list_conversations(page)
+    target_company = " ".join(conversation.company.split()).lower()
+    target_preview = " ".join(conversation.preview.split()).lower()
+    for candidate in conversations:
+        company = " ".join(candidate.company.split()).lower()
+        preview = " ".join(candidate.preview.split()).lower()
+        if target_preview and preview and preview[:40] == target_preview[:40]:
+            return candidate.index
+        if company and target_company and company == target_company:
+            return candidate.index
+    return None
+
+
 def open_conversation(page: Any, conversation: Conversation) -> list[Message]:
     """Open a conversation and return its messages."""
     if conversation.url:
@@ -140,13 +162,20 @@ def open_conversation(page: Any, conversation: Conversation) -> list[Message]:
     else:
         # The list only exists on the inbox page, so a row is clicked from a
         # freshly loaded list (after the first conversation the list is gone).
+        # The row is found by its CONTENT, because the list may have shifted
+        # since it was listed.
         open_inbox(page)
-        rows = page.locator(LIST_ITEM)
-        if conversation.index >= rows.count():
+        index = find_row(page, conversation)
+        if index is None:
             raise IndeedScraperError(
                 f"Conversation {conversation.company!r} is no longer in the list."
             )
-        rows.nth(conversation.index).click()
+        rows = page.locator(LIST_ITEM)
+        if index >= rows.count():
+            raise IndeedScraperError(
+                f"Conversation {conversation.company!r} is no longer in the list."
+            )
+        rows.nth(index).click()
     page.wait_for_timeout(3000)
     raw = page.evaluate(_JS_MESSAGES)
     return [

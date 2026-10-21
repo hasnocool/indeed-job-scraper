@@ -134,11 +134,14 @@ def _page(tmp_path: Path) -> _FakePage:
 
 
 def _profile(tmp_path: Path) -> Profile:
+    """A profile whose resume is a real PDF (the apply path refuses a stub)."""
+    resume = tmp_path / "resume.pdf"
+    resume.write_bytes(b"%PDF-1.4\n" + b"0 " * 2048)
     return Profile(
         name="Ada Lovelace",
         email="ada@example.com",
         phone="250-555-0142",
-        resume_path=str(tmp_path / "resume.pdf"),
+        resume_path=str(resume),
     )
 
 

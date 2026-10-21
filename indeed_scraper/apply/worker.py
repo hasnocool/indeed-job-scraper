@@ -172,6 +172,11 @@ def _fill_and_submit(
             ledger.mark(fingerprint, "failed", "operator_declined")
             return _result(job, fingerprint, "failed", portal, "operator_declined")
 
+    # The submission is recorded as ATTEMPTED before the irreversible click.
+    # If the run dies between here and the confirmation, the ledger still
+    # shows the attempt, so the posting is never applied to a second time.
+    ledger.mark(fingerprint, "submitting", "")
+
     submitted = indeed_form.submit_application(page)
     if not submitted:
         ledger.mark(fingerprint, "failed", "submit_not_confirmed")

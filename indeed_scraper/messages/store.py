@@ -88,9 +88,19 @@ def read_sent(state_dir: Path) -> list[dict[str, Any]]:
     return entries
 
 
+#: A conversation is answered once. "sending" counts as answered: the
+#: message may have gone out even if the run died before recording it, and
+#: a second reply to the same recruiter is worse than a missed one.
+ANSWERED_STATUSES = ("sent", "sending")
+
+
 def already_replied(state_dir: Path, conversation_id: str) -> bool:
-    """True when this conversation already received a sent reply."""
+    """True when this conversation already received (or may have) a reply."""
+    if not conversation_id:
+        # An unknown conversation is treated as answered: fail closed.
+        return True
     return any(
-        entry.get("conversation_id") == conversation_id and entry.get("status") == "sent"
+        entry.get("conversation_id") == conversation_id
+        and entry.get("status") in ANSWERED_STATUSES
         for entry in read_sent(state_dir)
     )

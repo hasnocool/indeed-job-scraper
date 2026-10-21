@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from rich.console import Console
@@ -31,7 +32,7 @@ from .drafts import draft_payload, read_draft, write_draft
 from .driver import open_driver
 from .exceptions import ApplyBlockedError
 from .ledger import ApplicationLedger
-from .profile import Profile
+from .profile import Profile, validate_resume
 from .risk import RiskBudget
 from .types import ApplyResult
 from .worker import _apply_one, _result
@@ -74,13 +75,20 @@ def _apply_jobs_on_page(
     for job in jobs:
         fingerprint = job_fingerprint(job)
         status = ledger.status_of(fingerprint)
-        if status == "submitted" or (status == "reserved" and not _stale(ledger, fingerprint)):
+        if status in {"submitted", "submitting"}:
+            # "submitting" means a previous run reached the submit click and
+            # may have gone out. It is NEVER re-applied: a duplicate
+            # application is worse than a missed one.
+            console.print(f"[dim]skip {job.title[:40]} - already applied[/dim]")
+            results.append(_result(job, fingerprint, "failed", "unknown", "duplicate"))
+            continue
+        if status == "reserved" and not _stale(ledger, fingerprint):
             console.print(f"[dim]skip {job.title[:40]} - already applied[/dim]")
             results.append(_result(job, fingerprint, "failed", "unknown", "duplicate"))
             continue
         if status == "reserved":
-            # A previous run was killed mid-application: release the stale
-            # reservation so the posting is not blocked forever.
+            # A previous run was killed BEFORE the submit click: release the
+            # stale reservation so the posting is not blocked forever.
             ledger.mark(fingerprint, "failed", "stale_reservation_released")
             console.print(f"[dim]released a stale reservation for {job.title[:40]}[/dim]")
         if not budget.can_apply(ledger):
@@ -138,6 +146,9 @@ def apply_to_jobs(
     # The policy may allow an unattended submission; the confirm gate then
     # only applies when the policy keeps it.
     needs_confirm = confirm and not rules.allows_submit
+    # The resume is uploaded to an employer, so it must be a real document.
+    # Checked here, before any browser work, so the operator is told at once.
+    validate_resume(Path(profile.resume_path).expanduser())
     session = store.current()
     if session is None or not session.is_signed_in():
         raise ApplyBlockedError("no-session", "")
@@ -206,6 +217,7 @@ def resume_application(
         min_delay_minutes=rules.min_delay_minutes,
     )
     needs_confirm = confirm and not rules.allows_submit
+    validate_resume(Path(profile.resume_path).expanduser())
     if not dry_run and not budget.can_apply(ledger):
         console.print("[yellow]daily application budget reached - not resuming.[/yellow]")
         return None

@@ -105,6 +105,26 @@ def _make_page(url: str = "https://ca.indeed.com/viewjob?jk=test") -> _FakePage:
     return _FakePage(url)
 
 
+#: The shared resume fixture the form tests fill against.
+SHARED_RESUME = "/tmp/resume.pdf"
+
+
+def _ensure_resume(path: str = SHARED_RESUME) -> str:
+    """Make sure the SHARED resume fixture is a real PDF.
+
+    Only the shared default is managed here: a path the caller chose is
+    never created, so a test can point at a file that does not exist.
+    """
+    import pathlib
+
+    if path != SHARED_RESUME:
+        return path
+    target = pathlib.Path(path)
+    if not target.exists() or target.stat().st_size < 1024:
+        target.write_bytes(b"%PDF-1.4\n" + b"0 " * 2048)
+    return path
+
+
 def _make_profile(
     name: str = "Ada",
     email: str = "ada@example.com",
@@ -112,6 +132,7 @@ def _make_profile(
     resume_path: str = "/tmp/resume.pdf",
     cover_letter: str = "",
 ) -> Profile:
+    _ensure_resume(resume_path)
     return Profile(
         name=name,
         email=email,
@@ -267,7 +288,7 @@ def test_fill_indeed_form_raises_field_missing_for_missing_resume() -> None:
     """fill_indeed_form raises FieldMissingError when resume_path points to a missing file."""
     import pathlib
 
-    resume_path = "/tmp/resume.pdf"
+    resume_path = "/tmp/indeed_missing_resume_fixture.pdf"
     if pathlib.Path(resume_path).exists():
         pathlib.Path(resume_path).unlink()
 
@@ -284,15 +305,15 @@ def test_fill_indeed_form_raises_field_missing_for_missing_resume() -> None:
 
     _populate_form_selectors(page)
 
-    profile = _make_profile(resume_path="/tmp/resume.pdf")
+    profile = _make_profile(resume_path=resume_path)
     with pytest.raises(FieldMissingError) as excinfo:
         fill_indeed_form(page, profile)
 
-    assert excinfo.value.question == "resume: /tmp/resume.pdf"
+    assert "resume" in excinfo.value.question
+    assert resume_path in excinfo.value.question
     assert excinfo.value.job_url == "https://ca.indeed.com/apply/in/test123"
 
-    # Restore the file for other tests
-    pathlib.Path(resume_path).touch()
+    # Nothing to restore: the path was never created.
 
 
 def test_fill_indeed_form_with_all_fields() -> None:

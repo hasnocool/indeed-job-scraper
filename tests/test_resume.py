@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from indeed_scraper.apply.exceptions import FieldMissingError
 from indeed_scraper.apply.profile import (
     MIN_RESUME_BYTES,
     Profile,
@@ -18,6 +19,12 @@ from indeed_scraper.apply.profile import (
     save_profile,
     validate_resume,
 )
+
+
+class _StubPage:
+    """The smallest page the resume check needs."""
+
+    url = "https://ca.indeed.com/apply/in/test123"
 
 
 def _pdf(size: int = 2048) -> bytes:
@@ -55,8 +62,13 @@ def test_a_non_pdf_is_refused(tmp_path: Path) -> None:
     assert "not a PDF" in str(error.value)
 
 
-def test_the_profile_cannot_be_loaded_with_a_placeholder(tmp_path: Path) -> None:
-    """The gate is on the load path, so no code path can slip past it."""
+def test_the_profile_loads_without_a_usable_resume(tmp_path: Path) -> None:
+    """Loading a profile must not require a resume.
+
+    The resume is only needed to APPLY. The messaging path reads the same
+    profile, and a recruiter reply does not need a resume file, so the gate
+    lives on the apply path, not on the load path.
+    """
     stub = tmp_path / "resume.pdf"
     stub.write_bytes(b"%PDF-1.4\n% stub\n")
     profile = Profile(
@@ -67,8 +79,24 @@ def test_the_profile_cannot_be_loaded_with_a_placeholder(tmp_path: Path) -> None
     )
     path = tmp_path / "profile.json"
     save_profile(profile, path)
-    with pytest.raises(ProfileNotFoundError):
-        load_profile(path)
+    assert load_profile(path).resume_path == str(stub)
+
+
+def test_the_apply_path_refuses_a_placeholder_resume(tmp_path: Path) -> None:
+    """The gate is on the apply path, so no application can slip past it."""
+    from indeed_scraper.apply.indeed_form import fill_indeed_form
+
+    stub = tmp_path / "resume.pdf"
+    stub.write_bytes(b"%PDF-1.4\n% stub\n")
+    profile = Profile(
+        name="Test",
+        email="t@example.com",
+        phone="555",
+        resume_path=str(stub),
+    )
+    with pytest.raises(FieldMissingError) as error:
+        fill_indeed_form(_StubPage(), profile)
+    assert "placeholder" in str(error.value)
 
 
 def test_the_profile_loads_with_a_real_resume(tmp_path: Path) -> None:

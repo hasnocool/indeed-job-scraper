@@ -51,7 +51,7 @@ def _config(tmp_path: Path):
 def _profile_with_resume(tmp_path: Path):
     """A profile whose resume file actually exists (the flow refuses otherwise)."""
     resume = tmp_path / "resume.pdf"
-    resume.write_bytes(b"%PDF-1.4\n")
+    resume.write_bytes(b"%PDF-1.4\n" + b"0 " * 2048)
     return _profile(tmp_path)
 
 

@@ -332,9 +332,17 @@ def apply(
     """Apply to postings from the organized master dataset.
 
     Every application is reserved in the ledger before the browser is touched,
-    and a submission ALWAYS requires the operator to confirm it - there is no
-    flag that skips that gate. A challenge stops the run so the shared session is
-    never poisoned.
+    so a posting is never applied to twice. Whether a submission is confirmed
+    first is decided by the AUTONOMY POLICY
+    (~/.config/indeed_scraper/policy.json):
+
+        manual  every submission is confirmed by the operator
+        auto    submissions are sent unattended, inside the risk budget
+        full    submissions are sent unattended, inside the risk budget
+
+    A reply that accepts an offer is never sent unattended unless the policy
+    explicitly allows binding commitments. A challenge stops the run so the
+    shared session is never poisoned.
     """
     from .apply.exceptions import ProfileNotFoundError
     from .apply.flow import apply_to_jobs
@@ -471,8 +479,20 @@ def _policy(autonomy: str | None, max_per_day: int | None, min_delay: float | No
         if level not in LEVELS:
             console.print(f"[red]--autonomy must be one of {', '.join(LEVELS)}[/red]")
             raise typer.Exit(code=1)
+    # The policy FILE is the operator's standing decision, so it is the
+    # ceiling: the override can lower the autonomy for one run but never
+    # raise it above what the file allows.
+    requested = level  # type: ignore[assignment]
+    if requested != rules.level:
+        capped = rules.restrict_to(requested)
+        if capped.level != requested:
+            console.print(
+                f"[yellow]--autonomy {requested} is above the policy file "
+                f"({rules.level}); using {capped.level}.[/yellow]"
+            )
+        rules = capped
     rules = AutonomyPolicy(
-        level=level,  # type: ignore[arg-type]
+        level=rules.level,
         max_applications_per_day=rules.max_applications_per_day if max_per_day is None else max_per_day,
         min_delay_minutes=rules.min_delay_minutes if min_delay is None else min_delay,
         allow_binding_commitments=rules.allow_binding_commitments,

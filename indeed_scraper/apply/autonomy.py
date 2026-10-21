@@ -82,7 +82,15 @@ class AutonomyPolicy:
         if not target.is_file():
             return cls.from_env()
         try:
-            data = json.loads(target.read_text(encoding="utf-8"))
+            raw = target.read_text(encoding="utf-8")
+        except OSError as error:
+            raise IndeedScraperError(
+                f"Cannot read the policy file {target}: {error}. "
+                "Fix its permissions, or remove it to fall back to the "
+                "conservative default."
+            ) from error
+        try:
+            data = json.loads(raw)
         except json.JSONDecodeError as error:
             raise IndeedScraperError(
                 f"Invalid JSON in policy file {target}: {error}"
@@ -136,6 +144,24 @@ class AutonomyPolicy:
     def allows_binding_commitment(self) -> bool:
         """True when an offer-accepting reply may be sent unattended."""
         return self.allow_binding_commitments
+
+    def restrict_to(self, level: AutonomyLevel) -> AutonomyPolicy:
+        """Return a policy that is no more autonomous than this one.
+
+        The policy FILE is the operator's standing decision and therefore
+        the ceiling: a command-line flag or an environment variable can
+        lower the autonomy for one run, but never raise it above what the
+        operator allowed in the file.
+        """
+        order = ("manual", "auto", "full")
+        if order.index(level) >= order.index(self.level):
+            return self
+        return AutonomyPolicy(
+            level=level,
+            max_applications_per_day=self.max_applications_per_day,
+            min_delay_minutes=self.min_delay_minutes,
+            allow_binding_commitments=self.allow_binding_commitments,
+        )
 
     def describe(self) -> str:
         """A one-line human summary."""

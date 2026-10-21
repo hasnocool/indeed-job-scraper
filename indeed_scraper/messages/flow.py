@@ -24,8 +24,9 @@ from ..apply.autonomy import AutonomyPolicy
 from ..apply.driver import open_driver
 from ..apply.profile import Profile
 from ..cookies import CookieStore
-from .compose import build_reply
+from .compose import build_reply, redact_operator
 from .inbox import (
+    Conversation,
     Message,
     current_conversation_id,
     list_conversations,
@@ -44,6 +45,29 @@ class InboxOutcome:
     conversation_id: str
     action: str
     detail: str = ""
+
+
+def _matches_listed(conversation: Conversation, messages: list[Message]) -> bool:
+    """True when the opened thread is the conversation that was listed.
+
+    The inbox is a virtualised listbox: a new recruiter message shifts the
+    rows, so an index captured earlier can point at a DIFFERENT thread. The
+    reply must go to the thread that was listed, so the opened thread is
+    checked against the listing (preview text or participant name) before
+    anything is sent.
+    """
+    preview = " ".join((conversation.preview or "").split()).lower()
+    if preview:
+        key = preview[:40]
+        for message in messages:
+            if key in " ".join(message.text.split()).lower():
+                return True
+    company = " ".join((conversation.company or "").split()).lower()
+    if company:
+        for message in messages:
+            if company in " ".join(message.sender.split()).lower():
+                return True
+    return False
 
 
 def _is_our_message(message: Message, profile: Profile) -> bool:
@@ -97,17 +121,46 @@ def handle_inbox(
                 break
             if conversation.locked:
                 continue
-            if already_replied(config.state_dir, conversation.conversation_id):
-                outcomes.append(
-                    InboxOutcome(conversation.company, conversation.conversation_id, "skipped", "already replied")
-                )
-                continue
             try:
                 messages = open_conversation(page, conversation)
                 conversation_id = current_conversation_id(page) or conversation.conversation_id
             except Exception as error:  # noqa: BLE001
                 outcomes.append(
                     InboxOutcome(conversation.company, conversation.conversation_id, "failed", str(error)[:80])
+                )
+                continue
+            # The list order can change between listing and clicking, so the
+            # opened thread is verified against the listing BEFORE anything
+            # is sent. A mismatch means a different recruiter is open.
+            if not _matches_listed(conversation, messages):
+                outcomes.append(
+                    InboxOutcome(
+                        conversation.company,
+                        conversation_id,
+                        "skipped",
+                        "the inbox list changed; the opened thread did not match",
+                    )
+                )
+                continue
+            if not conversation_id:
+                # Without a stable id the conversation cannot be recognised
+                # later, so replying now would risk answering it twice.
+                outcomes.append(
+                    InboxOutcome(
+                        conversation.company,
+                        "",
+                        "skipped",
+                        "the conversation id could not be determined",
+                    )
+                )
+                continue
+            # The conversation id is only known once the conversation is open
+            # (it appears in the URL after the click), so the dedupe check
+            # MUST happen here. Checking it earlier compares against an empty
+            # id and never matches, which would reply twice.
+            if already_replied(config.state_dir, conversation_id):
+                outcomes.append(
+                    InboxOutcome(conversation.company, conversation_id, "skipped", "already replied")
                 )
                 continue
             incoming = _latest_incoming(messages, profile)
@@ -127,7 +180,7 @@ def handle_inbox(
                     config.state_dir,
                     conversation_id=conversation_id,
                     company=conversation.company,
-                    body=plan.body,
+                    body=redact_operator(plan.body, profile),
                     status="drafted",
                     kind=plan.kind,
                     detail=reason,
@@ -162,7 +215,7 @@ def handle_inbox(
                 config.state_dir,
                 conversation_id=conversation_id,
                 company=conversation.company,
-                body=plan.body,
+                body=redact_operator(plan.body, profile),
                 status="sent",
                 kind=plan.kind,
             )

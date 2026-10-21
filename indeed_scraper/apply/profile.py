@@ -101,9 +101,7 @@ def load_profile(path: Path | None = None) -> Profile:
         raise ProfileNotFoundError(
             f"Invalid JSON in profile file {expanded}: {exc}"
         ) from exc
-    profile = Profile(**data)
-    validate_resume(Path(profile.resume_path).expanduser())
-    return profile
+    return Profile(**data)
 
 
 def save_profile(profile: Profile, path: Path | None = None) -> Path:
