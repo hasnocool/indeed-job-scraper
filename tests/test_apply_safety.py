@@ -123,3 +123,55 @@ def test_daily_budget_ignores_other_days(tmp_path: Path) -> None:
     ledger.mark("fp-1", "submitted", "")
     yesterday = datetime.now(tz=timezone.utc).replace(year=2000)
     assert ledger.submitted_today(yesterday) == 0
+
+
+def test_a_stale_reservation_does_not_block_a_posting_forever(tmp_path: Path) -> None:
+    """A run killed mid-application must not block the posting for ever.
+
+    The reservation is the idempotency guard, but a killed run leaves a
+    "reserved" line behind with no follow-up. The lease expires it so the
+    posting can be retried.
+    """
+    from datetime import timedelta
+
+    from indeed_scraper.apply.flow import RESERVATION_LEASE_SECONDS, _stale
+
+    path = tmp_path / "ledger.jsonl"
+    old = datetime.now(tz=timezone.utc) - timedelta(seconds=RESERVATION_LEASE_SECONDS + 600)
+    path.write_text(
+        json.dumps(
+            {
+                "fingerprint": "fp-stale",
+                "jk": "jk",
+                "indeed_url": "u",
+                "company": "",
+                "title": "",
+                "applied_at": old.isoformat(),
+                "status": "reserved",
+                "detail": "",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    ledger = ApplicationLedger(path)
+
+    assert ledger.reservation_age("fp-stale") is not None
+    assert _stale(ledger, "fp-stale") is True
+
+    # A fresh reservation is not stale.
+    fresh = ApplicationLedger(tmp_path / "fresh.jsonl")
+    fresh.reserve("fp-fresh", "jk", "u")
+    assert _stale(fresh, "fp-fresh") is False
+
+
+def test_a_submitted_posting_is_never_stale(tmp_path: Path) -> None:
+    """A real submission blocks the posting for good, whatever the age."""
+    from indeed_scraper.apply.flow import _stale
+
+    ledger = ApplicationLedger(tmp_path / "ledger.jsonl")
+    ledger.reserve("fp-done", "jk", "u")
+    ledger.mark("fp-done", "submitted", "")
+
+    assert ledger.reservation_age("fp-done") is None
+    assert _stale(ledger, "fp-done") is False

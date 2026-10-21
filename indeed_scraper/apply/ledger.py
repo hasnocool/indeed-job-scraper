@@ -201,6 +201,36 @@ class ApplicationLedger:
                     latest = status
         return latest
 
+    def reservation_age(self, fingerprint: str, now: datetime | None = None) -> float | None:
+        """Seconds since the posting was reserved, or None if it is not reserved.
+
+        A run that is killed mid-application leaves a "reserved" line behind.
+        The caller uses the age to expire that stale reservation, so the posting
+        is not blocked forever.
+        """
+        self._reparse()
+        stamp: str | None = None
+        status: str | None = None
+        for entry in self._entries:
+            if entry.get("fingerprint") != fingerprint:
+                continue
+            value = entry.get("status")
+            if isinstance(value, str):
+                status = value
+            applied = entry.get("applied_at")
+            if isinstance(applied, str):
+                stamp = applied
+        if status != "reserved" or stamp is None:
+            return None
+        try:
+            when = datetime.fromisoformat(stamp)
+        except ValueError:
+            return None
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=timezone.utc)
+        moment = now or datetime.now(timezone.utc)
+        return (moment - when).total_seconds()
+
     def submitted_today(self, now: datetime | None = None) -> int:
         """Count the postings submitted today.
 

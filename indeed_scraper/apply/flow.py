@@ -47,6 +47,16 @@ def _now_iso() -> str:
 
 
 
+#: A reservation older than this is treated as abandoned (the run was killed).
+RESERVATION_LEASE_SECONDS = 2 * 60 * 60
+
+
+def _stale(ledger: ApplicationLedger, fingerprint: str) -> bool:
+    """True when a reservation is older than the lease and may be retried."""
+    age = ledger.reservation_age(fingerprint)
+    return age is not None and age > RESERVATION_LEASE_SECONDS
+
+
 def _apply_jobs_on_page(
     page: Any,
     jobs: list[Job],
@@ -63,10 +73,16 @@ def _apply_jobs_on_page(
     last_submit: datetime | None = None
     for job in jobs:
         fingerprint = job_fingerprint(job)
-        if ledger.status_of(fingerprint) in {"reserved", "submitted"}:
+        status = ledger.status_of(fingerprint)
+        if status == "submitted" or (status == "reserved" and not _stale(ledger, fingerprint)):
             console.print(f"[dim]skip {job.title[:40]} - already applied[/dim]")
             results.append(_result(job, fingerprint, "failed", "unknown", "duplicate"))
             continue
+        if status == "reserved":
+            # A previous run was killed mid-application: release the stale
+            # reservation so the posting is not blocked forever.
+            ledger.mark(fingerprint, "failed", "stale_reservation_released")
+            console.print(f"[dim]released a stale reservation for {job.title[:40]}[/dim]")
         if not budget.can_apply(ledger):
             console.print("[yellow]risk budget reached - stopping for today.[/yellow]")
             break
