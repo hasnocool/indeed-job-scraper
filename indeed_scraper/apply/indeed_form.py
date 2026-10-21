@@ -91,7 +91,7 @@ def fill_indeed_form(page: Page, profile: Profile, draft: dict | None = None) ->
         if not value:
             # The profile has an empty string for this field: if the DOM marks
             # it required, the operator has not supplied a value for it.
-            if _is_field_required(page, field_sels[0]):
+            if _is_field_required(page, field_sels[0]) is True:
                 question = _find_required_field_label(page, field_sels[0]) or field_name
                 raise FieldMissingError(question, job_url)
             return
@@ -106,6 +106,8 @@ def fill_indeed_form(page: Page, profile: Profile, draft: dict | None = None) ->
             except Exception:  # noqa: BLE001, S112 - try the next selector
                 continue
         if not filled:
+            # None means the field is not on this form at all (so it is not
+            # missing); True means required (or unreadable -> be strict).
             is_req = _is_field_required(page, field_sels[0])
             if is_req:
                 question = _find_required_field_label(page, field_sels[0]) or field_name

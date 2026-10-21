@@ -245,6 +245,57 @@ repository's own persistent profile. The fallback matters: Indeed's bot
 protection rejects the harness' headless browser, while the warmed local
 profile carries the `cf_clearance` cookie and works.
 
+### Autonomy policy
+
+Whether the agent acts on its own is an explicit, operator-owned setting in
+``~/.config/indeed_scraper/policy.json`` (0600), not a hard-coded rule:
+
+```json
+{
+  "level": "full",
+  "max_applications_per_day": 25,
+  "min_delay_minutes": 15,
+  "allow_binding_commitments": false
+}
+```
+
+| Level | Submissions | Replies |
+| --- | --- | --- |
+| ``manual`` | asked every time | drafted only |
+| ``auto`` | sent unattended (inside the budget) | drafted only |
+| ``full`` | sent unattended (inside the budget) | sent unattended |
+
+``--autonomy manual|auto|full`` overrides the file for one run. The daily cap
+and the delay are enforced by the flow, so a policy cannot be used to exceed
+them.
+
+One thing stays gated in every level: a reply that **accepts an offer** or
+agrees to contractual terms. That is a binding commitment made on the
+operator's behalf, and it is only sent unattended when
+``allow_binding_commitments`` is true.
+
+## Replying to recruiters
+
+Indeed's candidate inbox is a separate web app (``messages.indeed.com``)
+reached with the same saved session.
+
+```bash
+# Read the inbox and draft replies without sending them
+python3 -m indeed_scraper messages --dry-run --limit 5
+
+# Send the replies the policy allows
+python3 -m indeed_scraper messages --limit 5
+```
+
+Each incoming message is classified (``offer``, ``interview``, ``question``,
+``general``) and answered from the operator profile: interview replies quote
+the stated availability, and a question the profile can answer is answered
+from ``screening_answers``. A question it cannot answer is drafted for the
+operator instead of being guessed. Every decision - sent or drafted - is
+appended to ``data/messages/sent.jsonl``, so an unattended reply can be
+audited afterwards, and a conversation that already received a reply is never
+answered twice.
+
 ### Scope and limits
 
 External ATS pages (Greenhouse, Lever, Workday, ...) are detected and recorded

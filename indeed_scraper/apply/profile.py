@@ -50,6 +50,12 @@ def load_profile(path: Path | None = None) -> Profile:
             f"Profile not found at {expanded}. "
             "Create the file with the required fields (name, email, phone, resume_path)."
         )
+    mode = expanded.stat().st_mode & 0o077
+    if mode:
+        raise ProfileNotFoundError(
+            f"Profile file {expanded} is readable by others (mode {mode:o}). "
+            f"Run: chmod 600 {expanded}"
+        )
     try:
         data = json.loads(expanded.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
@@ -83,10 +89,10 @@ def save_profile(profile: Profile, path: Path | None = None) -> Path:
 
 
 def apply_data(profile: Profile) -> ApplyData:
-    """Map a Profile to an ApplyData dataclass.
+    """Map a Profile to the ApplyData shape the form filler consumes.
 
-    work_authorization, salary_expectations and availability default to '';
-    callers must treat '' as MISSING and never fabricate.
+    The mapping is an in-memory convenience only: the values never reach the
+    ledger or a draft file, which carry field NAMES instead.
     """
     return ApplyData(
         name=profile.name,

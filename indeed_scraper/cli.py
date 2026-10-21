@@ -317,6 +317,17 @@ def apply(
     profile_path: Path = typer.Option(  # noqa: B008 - typer's option pattern
         None, "--profile", help="Profile file (default ~/.config/indeed_scraper/profile.json)."
     ),
+    autonomy: str = typer.Option(
+        None,
+        "--autonomy",
+        help="manual | auto | full. Overrides the policy file for this run.",
+    ),
+    max_per_day: int = typer.Option(
+        None, "--max-per-day", help="Override the daily application cap for this run."
+    ),
+    min_delay: float = typer.Option(
+        None, "--min-delay", help="Override the minimum delay between submissions (minutes)."
+    ),
 ) -> None:
     """Apply to postings from the organized master dataset.
 
@@ -339,6 +350,8 @@ def apply(
 
     config = _config()
     store = CookieStore(config)
+    rules = _policy(autonomy, max_per_day, min_delay)
+    console.print(f"[dim]autonomy: {rules.describe()}[/dim]")
     try:
         results = apply_to_jobs(
             config,
@@ -348,6 +361,7 @@ def apply(
             limit=limit,
             confirm=True,
             dry_run=dry_run,
+            policy=rules,
         )
     except IndeedScraperError as error:
         console.print(f"[red]{error}[/red]")
@@ -374,6 +388,9 @@ def apply(
 def resume(
     app_id: str = typer.Argument(..., help="Application id (the 12-char job id)."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Refill but do not submit."),
+    autonomy: str = typer.Option(
+        None, "--autonomy", help="manual | auto | full. Overrides the policy file for this run."
+    ),
 ) -> None:
     """Resume an interrupted application from its persisted draft."""
     from .apply.exceptions import ProfileNotFoundError
@@ -388,9 +405,18 @@ def resume(
 
     config = _config()
     store = CookieStore(config)
+    rules = _policy(autonomy, None, None)
+    console.print(f"[dim]autonomy: {rules.describe()}[/dim]")
     try:
         result = resume_application(
-            config, store, console, app_id, profile=profile, confirm=True, dry_run=dry_run
+            config,
+            store,
+            console,
+            app_id,
+            profile=profile,
+            confirm=True,
+            dry_run=dry_run,
+            policy=rules,
         )
     except IndeedScraperError as error:
         console.print(f"[red]{error}[/red]")
@@ -428,6 +454,85 @@ def check_responses() -> None:
             str(record.get("checked_at", ""))[:19],
         )
     console.print(table)
+
+
+def _policy(autonomy: str | None, max_per_day: int | None, min_delay: float | None):
+    """Resolve the autonomy policy: the policy file, with optional overrides."""
+    from .apply.autonomy import LEVELS, AutonomyPolicy
+
+    try:
+        rules = AutonomyPolicy.load()
+    except IndeedScraperError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+    level = rules.level
+    if autonomy:
+        level = autonomy.strip().lower()
+        if level not in LEVELS:
+            console.print(f"[red]--autonomy must be one of {', '.join(LEVELS)}[/red]")
+            raise typer.Exit(code=1)
+    rules = AutonomyPolicy(
+        level=level,  # type: ignore[arg-type]
+        max_applications_per_day=rules.max_applications_per_day if max_per_day is None else max_per_day,
+        min_delay_minutes=rules.min_delay_minutes if min_delay is None else min_delay,
+        allow_binding_commitments=rules.allow_binding_commitments,
+    )
+    return rules
+
+
+@app.command()
+def messages(
+    limit: int = typer.Option(10, "--limit", "-n", help="Maximum conversations to consider."),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Draft the replies but send nothing."
+    ),
+    autonomy: str = typer.Option(
+        None, "--autonomy", help="manual | auto | full. Overrides the policy file for this run."
+    ),
+    profile_path: Path = typer.Option(  # noqa: B008 - typer's option pattern
+        None, "--profile", help="Profile file (default ~/.config/indeed_scraper/profile.json)."
+    ),
+) -> None:
+    """Read the Indeed inbox and answer the recruiters.
+
+    Replies are built from the operator profile. Whether they are sent or only
+    drafted depends on the autonomy policy; a reply that accepts an offer is
+    never sent without the operator's explicit approval.
+    """
+    from .apply.exceptions import ProfileNotFoundError
+    from .apply.profile import load_profile
+    from .messages.flow import handle_inbox, print_outcomes
+
+    try:
+        profile = load_profile(profile_path)
+    except ProfileNotFoundError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    config = _config()
+    store = CookieStore(config)
+    rules = _policy(autonomy, None, None)
+    console.print(f"[dim]autonomy: {rules.describe()}[/dim]")
+    try:
+        outcomes = handle_inbox(
+            config,
+            store,
+            console,
+            profile=profile,
+            policy=rules,
+            limit=limit,
+            dry_run=dry_run,
+        )
+    except IndeedScraperError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(code=1) from error
+    if outcomes:
+        print_outcomes(outcomes, console)
+    else:
+        console.print("[yellow]No conversations to handle.[/yellow]")
+    from .messages.store import sent_ledger_path
+
+    console.print(f"[dim]message log: {sent_ledger_path(config.state_dir)}[/dim]")
 
 
 def main(argv: Sequence[str] | None = None) -> int:

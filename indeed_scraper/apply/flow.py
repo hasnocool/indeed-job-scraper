@@ -17,12 +17,16 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timezone
+from typing import Any
 
 from rich.console import Console
 
 from ..config import Config
 from ..cookies import CookieStore
 from ..dedupe import job_fingerprint
+from ..scraper import Job
+from . import indeed_form
+from .autonomy import AutonomyPolicy
 from .drafts import draft_payload, read_draft, write_draft
 from .driver import open_driver
 from .exceptions import ApplyBlockedError
@@ -43,6 +47,59 @@ def _now_iso() -> str:
 
 
 
+def _apply_jobs_on_page(
+    page: Any,
+    jobs: list[Job],
+    profile: Profile,
+    ledger: ApplicationLedger,
+    config: Config,
+    console: Console,
+    budget: RiskBudget,
+    needs_confirm: bool,
+    dry_run: bool,
+) -> list[ApplyResult]:
+    """Run the guarded per-posting loop against an open page."""
+    results: list[ApplyResult] = []
+    last_submit: datetime | None = None
+    for job in jobs:
+        fingerprint = job_fingerprint(job)
+        if ledger.status_of(fingerprint) in {"reserved", "submitted"}:
+            console.print(f"[dim]skip {job.title[:40]} - already applied[/dim]")
+            results.append(_result(job, fingerprint, "failed", "unknown", "duplicate"))
+            continue
+        if not budget.can_apply(ledger):
+            console.print("[yellow]risk budget reached - stopping for today.[/yellow]")
+            break
+        if not dry_run and last_submit is not None:
+            wait = budget.delay_seconds(last_submit)
+            if wait > 0:
+                console.print(f"[dim]waiting {int(wait)}s before the next application[/dim]")
+                time.sleep(wait)
+        try:
+            result = _apply_one(
+                page,
+                job,
+                fingerprint,
+                profile,
+                ledger,
+                config,
+                console,
+                confirm=needs_confirm,
+                dry_run=dry_run,
+            )
+        except ApplyBlockedError as error:
+            console.print(f"[red]blocked: {error}[/red]")
+            results.append(_result(job, fingerprint, "blocked", "unknown", str(error)))
+            if budget.stop_on_captcha:
+                console.print("[red]challenge detected - stopping this run.[/red]")
+                break
+            continue
+        results.append(result)
+        if result.status == "submitted":
+            last_submit = datetime.now(tz=timezone.utc)
+    return results
+
+
 def apply_to_jobs(
     config: Config,
     store: CookieStore,
@@ -53,11 +110,18 @@ def apply_to_jobs(
     confirm: bool = True,
     dry_run: bool = False,
     risk_budget: RiskBudget | None = None,
+    policy: AutonomyPolicy | None = None,
+    page: Any | None = None,
 ) -> list[ApplyResult]:
     """Apply to postings from the master dataset, one guarded job at a time."""
-    from . import indeed_form
-
-    budget = risk_budget or RiskBudget()
+    rules = policy or AutonomyPolicy()
+    budget = risk_budget or RiskBudget(
+        max_per_day=rules.max_applications_per_day,
+        min_delay_minutes=rules.min_delay_minutes,
+    )
+    # The policy may allow an unattended submission; the confirm gate then
+    # only applies when the policy keeps it.
+    needs_confirm = confirm and not rules.allows_submit
     session = store.current()
     if session is None or not session.is_signed_in():
         raise ApplyBlockedError("no-session", "")
@@ -70,54 +134,25 @@ def apply_to_jobs(
         jobs = jobs[:limit]
 
     ledger = ApplicationLedger(ledger_path(config))
-    results: list[ApplyResult] = []
-    last_submit: datetime | None = None
 
+    if page is not None:
+        return _apply_jobs_on_page(
+            page, jobs, profile, ledger, config, console, budget, needs_confirm, dry_run
+        )
     with open_driver(config, session) as (context, info):
         console.print(f"[dim]driver: {info.kind} ({info.endpoint})[/dim]")
         existing_pages = list(context.pages)
         page = existing_pages[0] if existing_pages else context.new_page()
         owns_page = not existing_pages
-        for job in jobs:
-            fingerprint = job_fingerprint(job)
-            if ledger.status_of(fingerprint) in {"reserved", "submitted"}:
-                console.print(f"[dim]skip {job.title[:40]} - already applied[/dim]")
-                results.append(_result(job, fingerprint, "failed", "unknown", "duplicate"))
-                continue
-            if not budget.can_apply(ledger):
-                console.print("[yellow]risk budget reached - stopping for today.[/yellow]")
-                break
-            if not dry_run and last_submit is not None:
-                wait = budget.delay_seconds(last_submit)
-                if wait > 0:
-                    console.print(f"[dim]waiting {int(wait)}s before the next application[/dim]")
-                    time.sleep(wait)
-            try:
-                result = _apply_one(
-                    page,
-                    job,
-                    fingerprint,
-                    profile,
-                    ledger,
-                    config,
-                    console,
-                    confirm=confirm,
-                    dry_run=dry_run,
-                )
-            except ApplyBlockedError as error:
-                console.print(f"[red]blocked: {error}[/red]")
-                results.append(_result(job, fingerprint, "blocked", "unknown", str(error)))
-                if budget.stop_on_captcha:
-                    console.print("[red]challenge detected - stopping this run.[/red]")
-                    break
-                continue
-            results.append(result)
-            if result.status == "submitted":
-                last_submit = datetime.now(tz=timezone.utc)
-        del indeed_form
-        if owns_page:
-            page.close()
-    return results
+        try:
+            return _apply_jobs_on_page(
+                page, jobs, profile, ledger, config, console, budget, needs_confirm, dry_run
+            )
+        finally:
+            # Close the tab only if this flow opened it, so a challenge page is
+            # never left open in the shared browser.
+            if owns_page:
+                page.close()
 
 
 def resume_application(
@@ -130,10 +165,9 @@ def resume_application(
     confirm: bool = True,
     dry_run: bool = False,
     risk_budget: RiskBudget | None = None,
+    policy: AutonomyPolicy | None = None,
 ) -> ApplyResult | None:
     """Resume an interrupted application from its persisted draft."""
-    from . import indeed_form
-
     session = store.current()
     if session is None or not session.is_signed_in():
         raise ApplyBlockedError("no-session", "")
@@ -150,7 +184,12 @@ def resume_application(
         console.print("[yellow]Draft has no URL to resume from.[/yellow]")
         return None
 
-    budget = risk_budget or RiskBudget()
+    rules = policy or AutonomyPolicy()
+    budget = risk_budget or RiskBudget(
+        max_per_day=rules.max_applications_per_day,
+        min_delay_minutes=rules.min_delay_minutes,
+    )
+    needs_confirm = confirm and not rules.allows_submit
     if not dry_run and not budget.can_apply(ledger):
         console.print("[yellow]daily application budget reached - not resuming.[/yellow]")
         return None
@@ -179,6 +218,10 @@ def resume_application(
             filled = indeed_form.fill_indeed_form(page, profile)
             write_draft(drafts_dir(config), app_id, draft_payload(draft, filled))
             if dry_run:
+                # A rehearsal must leave an honest trace: release the
+                # reservation and report the real status, so the operator is
+                # not told the posting is still reserved.
+                ledger.mark(fingerprint, "failed", "dry_run_resume")
                 console.print("[cyan]dry-run[/cyan] resumed fill, not submitted")
                 return ApplyResult(
                     jk=str(draft.get("jk", "")),
@@ -188,11 +231,11 @@ def resume_application(
                     url=url,
                     fingerprint=fingerprint,
                     app_id=app_id,
-                    status="reserved",
+                    status="failed",
                     portal="indeed",
                     detail="dry_run_resume",
                 )
-            if confirm:
+            if needs_confirm:
                 console.print("[bold]Submit the resumed application?[/bold]")
                 if not console.input("[yellow]type 'yes' to submit: [/yellow]").strip().lower().startswith("y"):
                     ledger.mark(fingerprint, "failed", "operator_declined")
