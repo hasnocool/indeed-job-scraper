@@ -500,34 +500,59 @@ def _policy(autonomy: str | None, max_per_day: int | None, min_delay: float | No
     return rules
 
 
-def _mirror_tracker_statuses(ledger, entries) -> int:
-    """Copy Indeed's status for our applications into the local ledger.
+def _mirror_tracker_statuses(ledger, entries, state_dir) -> int:
+    """Copy Indeed's status for our applications into a SEPARATE store.
 
-    Matched on title and company: the ledger does not know Indeed's internal
-    application id, but both sides carry the posting identity.
+    Two rules make this safe:
+
+    * The tracker status is never written into the application ledger. The
+      ledger's status is the IDEMPOTENCY GUARD ("submitted" means submitted);
+      overwriting it with "hired" or "offer" would let the flow apply to the
+      same posting a second time.
+    * A tracker row is matched to a ledger entry only when the title AND the
+      company match, and only when that match is UNIQUE. An ambiguous match
+      is skipped rather than guessed, because writing to the wrong application
+      is worse than not writing at all.
     """
+    from .apply.tracker import record_tracker_status
+
     mirrored = 0
     for entry in entries:
         if not entry.title or entry.status == "unknown":
             continue
-        for record in ledger.entries:
-            same_title = str(record.get("title", "")).strip().lower() == entry.title.strip().lower()
-            same_company = (
-                not record.get("company")
-                or not entry.company
-                or str(record.get("company")).strip().lower() == entry.company.strip().lower()
-            )
-            if not (same_title and same_company):
-                continue
-            fingerprint = str(record.get("fingerprint", ""))
-            if not fingerprint:
-                continue
-            current = ledger.status_of(fingerprint)
-            if current != entry.status:
-                ledger.mark(fingerprint, entry.status, f"indeed:{entry.status_text or entry.status}")
-                mirrored += 1
-            break
+        candidates = [
+            record
+            for record in ledger.entries
+            if _tracker_row_matches(record, entry)
+        ]
+        if len(candidates) != 1:
+            # Zero matches: we did not apply to it. More than one: ambiguous.
+            continue
+        fingerprint = str(candidates[0].get("fingerprint", ""))
+        if not fingerprint:
+            continue
+        record_tracker_status(
+            state_dir,
+            fingerprint=fingerprint,
+            status=entry.status,
+            status_text=entry.status_text,
+            title=entry.title,
+            company=entry.company,
+        )
+        mirrored += 1
     return mirrored
+
+
+def _tracker_row_matches(record: dict, entry) -> bool:
+    """True when a ledger row is the SAME posting as a tracker row."""
+    title = str(record.get("title", "")).strip().lower()
+    company = str(record.get("company", "")).strip().lower()
+    if not title or not company:
+        return False
+    return (
+        title == entry.title.strip().lower()
+        and company == entry.company.strip().lower()
+    )
 
 
 profile_app = typer.Typer(help="Inspect and fix the operator profile.")
@@ -606,13 +631,21 @@ def sync() -> None:
     """Read Indeed's application tracker and mirror the status locally.
 
     Indeed records the outcome of every application (Applied, Interviewing,
-    Offer received, Hired, ...). This reads that status and writes it into the
-    application ledger, so an offer that Indeed has recorded is surfaced to the
+    Offer received, Hired, ...). This reads that status and records it in the
+    tracker store, so an offer that Indeed has recorded is surfaced to the
     operator instead of being acted on.
+
+    The status is deliberately NOT written into the application ledger: the
+    ledger's status is the idempotency guard, and overwriting "submitted"
+    with "hired" would let the flow apply to the same posting again.
     """
     from .apply.driver import open_driver
     from .apply.ledger import ApplicationLedger
-    from .apply.tracker import action_required, open_tracker, read_tracker
+    from .apply.tracker import (
+        action_required,
+        open_tracker,
+        read_tracker,
+    )
     from .apply.workspace import ledger_path
 
     config = _config()
@@ -625,7 +658,7 @@ def sync() -> None:
         open_tracker(context.pages[0] if context.pages else context.new_page())
         entries = read_tracker(context.pages[0] if context.pages else context.new_page())
     ledger = ApplicationLedger(ledger_path(config))
-    mirrored = _mirror_tracker_statuses(ledger, entries)
+    mirrored = _mirror_tracker_statuses(ledger, entries, config.state_dir)
     table = Table(title="Indeed application tracker")
     table.add_column("Title")
     table.add_column("Company")
@@ -644,7 +677,9 @@ def sync() -> None:
     console.print(table)
     console.print(f"[dim]{len(entries)} applications on Indeed[/dim]")
     if mirrored:
-        console.print(f"[green]mirrored {mirrored} status change(s) into the ledger[/green]")
+        console.print(
+            f"[green]mirrored {mirrored} status change(s) into the tracker store[/green]"
+        )
     if escalated:
         console.print(
             f"[yellow]{escalated} application(s) need your attention (offer or hired). "

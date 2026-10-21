@@ -31,6 +31,16 @@ from indeed_scraper.messages.compose import (
 )
 
 
+class _Console:
+    """A console that records what was printed."""
+
+    def __init__(self) -> None:
+        self.lines: list[str] = []
+
+    def print(self, *args: object, **kwargs: object) -> None:
+        self.lines.append(" ".join(str(a) for a in args))
+
+
 def _profile() -> Profile:
     return Profile(
         name="Brad Cooper",
@@ -163,27 +173,32 @@ def test_a_submitting_posting_is_never_applied_to_again(tmp_path: Path) -> None:
 def test_the_flow_skips_a_submitting_posting(tmp_path: Path) -> None:
     from indeed_scraper.apply.flow import _apply_jobs_on_page
     from indeed_scraper.apply.ledger import ApplicationLedger
+    from indeed_scraper.apply.risk import RiskBudget
+    from indeed_scraper.dedupe import job_fingerprint
     from indeed_scraper.scraper import Job
 
     ledger = ApplicationLedger(tmp_path / "ledger.jsonl")
-    ledger.reserve("fp", "jk", "url")
-    ledger.mark("fp", "submitting", "")
-
     job = Job(jk="jk", title="Role", company="Acme", location="BC", url="https://x/jk")
+    fingerprint = job_fingerprint(job)
+    ledger.reserve(fingerprint, "jk", "url")
+    ledger.mark(fingerprint, "submitting", "")
+
     results = _apply_jobs_on_page(
         page=object(),  # type: ignore[arg-type]
         jobs=[job],
         profile=_profile(),
         ledger=ledger,
         config=object(),  # type: ignore[arg-type]
-        console=object(),  # type: ignore[arg-type]
-        budget=object(),  # type: ignore[arg-type]
+        console=_Console(),
+        budget=RiskBudget(max_per_day=5, min_delay_minutes=0),
         needs_confirm=True,
         dry_run=False,
     )
     assert [r.status for r in results] == ["failed"]
     assert results[0].detail == "duplicate"
-    assert ledger.status_of("fp") == "submitting", "the submitting state was overwritten"
+    assert (
+        ledger.status_of(fingerprint) == "submitting"
+    ), "the submitting state was overwritten"
 
 
 # ---------------------------------------------------------------------------

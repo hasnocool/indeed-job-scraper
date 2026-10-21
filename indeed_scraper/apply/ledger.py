@@ -99,6 +99,28 @@ class ApplicationLedger:
         self._reparse()
         return any(entry.get("fingerprint") == fingerprint for entry in self._entries)
 
+    #: A posting in one of these states must not be applied to again. Every
+    #: other status (failed, dry_run, declined, ...) is retryable: a run that
+    #: was killed, or that the operator declined, must not lock the posting
+    #: out for ever.
+    LIVE_STATUSES = frozenset({"reserved", "submitting", "submitted"})
+
+    def _is_live_unlocked(self, fingerprint: str) -> bool:
+        """True when the posting is reserved, being submitted, or submitted.
+
+        The ledger is APPEND-ONLY, so the presence of a fingerprint says only
+        that it was seen at some point - the CURRENT status is what decides
+        whether the posting may be applied to again.
+        """
+        self._reparse()
+        status: str | None = None
+        for entry in self._entries:
+            if entry.get("fingerprint") == fingerprint:
+                value = entry.get("status")
+                if isinstance(value, str):
+                    status = value
+        return status in self.LIVE_STATUSES
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -134,8 +156,9 @@ class ApplicationLedger:
         """
         with self._lock():
             # Re-read under the lock: another process may have reserved this
-            # fingerprint since we last looked.
-            if self._has_fingerprint_unlocked(fingerprint):
+            # fingerprint since we last looked. Only a LIVE status blocks a
+            # new attempt; a released one must stay retryable.
+            if self._is_live_unlocked(fingerprint):
                 return False
 
             self._append_line(

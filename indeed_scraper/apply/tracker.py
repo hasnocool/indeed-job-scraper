@@ -13,7 +13,11 @@ acted on automatically.
 
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from ..errors import IndeedScraperError
@@ -166,3 +170,63 @@ def available_statuses(page: Any) -> list[str]:
         return names
     except Exception:  # noqa: BLE001 - the menu is optional
         return []
+
+#: The tracker status is kept in its OWN store, never in the application
+#: ledger: the ledger's status is the idempotency guard ("submitted" means
+#: submitted), and overwriting it with "hired" would let the flow apply to
+#: the same posting a second time.
+TRACKER_STATUS_FILENAME = "tracker_status.jsonl"
+
+
+def tracker_status_path(state_dir: Path) -> Path:
+    """Where the tracker statuses are kept (0600, append-only)."""
+    return state_dir / "applications" / TRACKER_STATUS_FILENAME
+
+
+def record_tracker_status(
+    state_dir: Path,
+    *,
+    fingerprint: str,
+    status: str,
+    status_text: str = "",
+    title: str = "",
+    company: str = "",
+) -> Path:
+    """Record Indeed's status for one application, in the tracker store."""
+    path = tracker_status_path(state_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.chmod(0o700)
+    record = {
+        "fingerprint": fingerprint,
+        "status": status,
+        "status_text": status_text,
+        "title": title,
+        "company": company,
+        "at": datetime.now(timezone.utc).isoformat(),
+    }
+    line = json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n"
+    fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    try:
+        os.write(fd, line.encode("utf-8"))
+    finally:
+        os.close(fd)
+    return path
+
+
+def read_tracker_statuses(state_dir: Path) -> list[dict]:
+    """Read the tracker statuses, newest last, skipping malformed lines."""
+    path = tracker_status_path(state_dir)
+    if not path.is_file():
+        return []
+    records: list[dict] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            records.append(payload)
+    return records
