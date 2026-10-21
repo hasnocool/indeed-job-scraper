@@ -296,6 +296,20 @@ appended to ``data/messages/sent.jsonl``, so an unattended reply can be
 audited afterwards, and a conversation that already received a reply is never
 answered twice.
 
+## Syncing with Indeed's application tracker
+
+Indeed records what happened to every application you made (Applied,
+Interviewing, **Offer received**, Hired, Not selected by employer, ...). The
+`sync` command reads that tracker and mirrors the status into the local
+ledger:
+
+```bash
+python3 -m indeed_scraper sync
+```
+
+An application whose status is `offer` or `hired` is reported as needing your
+attention and is never acted on automatically - the agent prepares, you decide.
+
 ### Scope and limits
 
 External ATS pages (Greenhouse, Lever, Workday, ...) are detected and recorded

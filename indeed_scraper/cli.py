@@ -480,6 +480,87 @@ def _policy(autonomy: str | None, max_per_day: int | None, min_delay: float | No
     return rules
 
 
+def _mirror_tracker_statuses(ledger, entries) -> int:
+    """Copy Indeed's status for our applications into the local ledger.
+
+    Matched on title and company: the ledger does not know Indeed's internal
+    application id, but both sides carry the posting identity.
+    """
+    mirrored = 0
+    for entry in entries:
+        if not entry.title or entry.status == "unknown":
+            continue
+        for record in ledger.entries:
+            same_title = str(record.get("title", "")).strip().lower() == entry.title.strip().lower()
+            same_company = (
+                not record.get("company")
+                or not entry.company
+                or str(record.get("company")).strip().lower() == entry.company.strip().lower()
+            )
+            if not (same_title and same_company):
+                continue
+            fingerprint = str(record.get("fingerprint", ""))
+            if not fingerprint:
+                continue
+            current = ledger.status_of(fingerprint)
+            if current != entry.status:
+                ledger.mark(fingerprint, entry.status, f"indeed:{entry.status_text or entry.status}")
+                mirrored += 1
+            break
+    return mirrored
+
+
+@app.command()
+def sync() -> None:
+    """Read Indeed's application tracker and mirror the status locally.
+
+    Indeed records the outcome of every application (Applied, Interviewing,
+    Offer received, Hired, ...). This reads that status and writes it into the
+    application ledger, so an offer that Indeed has recorded is surfaced to the
+    operator instead of being acted on.
+    """
+    from .apply.driver import open_driver
+    from .apply.ledger import ApplicationLedger
+    from .apply.tracker import action_required, open_tracker, read_tracker
+    from .apply.workspace import ledger_path
+
+    config = _config()
+    store = CookieStore(config)
+    session = store.current()
+    if session is None or not session.is_signed_in():
+        console.print("[red]No signed-in Indeed session. Run 'login' first.[/red]")
+        raise typer.Exit(code=1)
+    with open_driver(config, session) as (context, _info):
+        open_tracker(context.pages[0] if context.pages else context.new_page())
+        entries = read_tracker(context.pages[0] if context.pages else context.new_page())
+    ledger = ApplicationLedger(ledger_path(config))
+    mirrored = _mirror_tracker_statuses(ledger, entries)
+    table = Table(title="Indeed application tracker")
+    table.add_column("Title")
+    table.add_column("Company")
+    table.add_column("Status")
+    table.add_column("Applied")
+    escalated = 0
+    for entry in entries:
+        if action_required(entry):
+            escalated += 1
+        table.add_row(
+            entry.title[:40] or "-",
+            entry.company[:22] or "-",
+            entry.status,
+            entry.applied_on[:26] or "-",
+        )
+    console.print(table)
+    console.print(f"[dim]{len(entries)} applications on Indeed[/dim]")
+    if mirrored:
+        console.print(f"[green]mirrored {mirrored} status change(s) into the ledger[/green]")
+    if escalated:
+        console.print(
+            f"[yellow]{escalated} application(s) need your attention (offer or hired). "
+            "They are never acted on automatically.[/yellow]"
+        )
+
+
 @app.command()
 def messages(
     limit: int = typer.Option(10, "--limit", "-n", help="Maximum conversations to consider."),
