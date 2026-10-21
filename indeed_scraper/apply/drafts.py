@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
+
+
+def _now_iso() -> str:
+    return datetime.now(tz=timezone.utc).isoformat()
 
 
 def app_id_for(fingerprint: str) -> str:
@@ -43,3 +49,17 @@ def read_draft(root: Path, app_id: str) -> dict | None:
         return json.loads(p.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return None
+
+
+def draft_payload(draft: dict[str, Any], filled: dict[str, Any]) -> dict[str, Any]:
+    """Build the persisted draft WITHOUT the operator's personal values.
+
+    The draft records WHICH fields were filled and where to resume, never the
+    values themselves: name, email, phone and cover letter live only in the
+    0600 profile, so they are not duplicated into a second writable store.
+    The profile is the source of truth when the application is resumed.
+    """
+    payload = {k: v for k, v in draft.items() if k not in {"name", "email", "phone", "cover_letter"}}
+    payload["fields"] = sorted(filled)
+    payload["saved_at"] = _now_iso()
+    return payload

@@ -10,9 +10,9 @@ from .store import write_response
 RESPONSE_STATUSES = ("applied", "viewed", "interview", "rejected", "withdrawn", "unknown")
 
 
-def app_id_for(fingerprint: str) -> str:
-    """Return the first 12 characters of a fingerprint as the app_id."""
-    return fingerprint[:12]
+from indeed_scraper.apply.drafts import (
+    app_id_for,
+)
 
 
 def parse_status(text: str) -> str:

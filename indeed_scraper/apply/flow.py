@@ -23,7 +23,7 @@ from rich.console import Console
 from ..config import Config
 from ..cookies import CookieStore
 from ..dedupe import job_fingerprint
-from .drafts import read_draft, write_draft
+from .drafts import draft_payload, read_draft, write_draft
 from .driver import open_driver
 from .exceptions import ApplyBlockedError
 from .ledger import ApplicationLedger
@@ -145,6 +145,15 @@ def resume_application(
         console.print("[yellow]Draft has no URL to resume from.[/yellow]")
         return None
 
+    # Idempotency guard: a posting that already reached a terminal state must
+    # never be re-submitted by a resume.
+    previous = ledger.status_of(fingerprint) if fingerprint else None
+    if previous in {"submitted", "blocked"}:
+        console.print(
+            f"[yellow]{app_id} is already {previous} - not resuming.[/yellow]"
+        )
+        return None
+
     with open_driver(config, session) as (context, info):
         console.print(f"[dim]driver: {info.kind} ({info.endpoint})[/dim]")
         page = context.pages[0] if context.pages else context.new_page()
@@ -154,8 +163,8 @@ def resume_application(
         if challenge:
             ledger.mark(fingerprint, "blocked", f"challenge:{challenge}")
             raise ApplyBlockedError(challenge, url)
-        filled = indeed_form.fill_indeed_form(page, profile, draft)
-        write_draft(drafts_dir(config), app_id, filled)
+        filled = indeed_form.fill_indeed_form(page, profile)
+        write_draft(drafts_dir(config), app_id, draft_payload(draft, filled))
         if dry_run:
             console.print("[cyan]dry-run[/cyan] resumed fill, not submitted")
             return ApplyResult(

@@ -8,7 +8,7 @@ from rich.console import Console
 
 from ..config import Config
 from ..scraper import Job
-from .drafts import app_id_for, write_draft
+from .drafts import app_id_for, draft_payload, write_draft
 from .exceptions import ApplyBlockedError, FieldMissingError
 from .ledger import ApplicationLedger
 from .profile import Profile
@@ -89,6 +89,10 @@ def _apply_one(
             confirm=confirm,
             dry_run=dry_run,
         )
+    except ApplyBlockedError as error:
+        # A challenge is not a failure of the posting: it stopped the run.
+        ledger.mark(fingerprint, "blocked", f"challenge:{error}")
+        raise
     except Exception as error:
         ledger.mark(fingerprint, "failed", f"error:{type(error).__name__}")
         raise
@@ -130,7 +134,30 @@ def _fill_and_submit(
         console.print(f"[yellow]{job.title[:40]} - missing: {error.question}[/yellow]")
         return _result(job, fingerprint, "blocked", portal, f"missing:{error.question}")
 
-    write_draft(drafts_dir(config), app_id_for(fingerprint), draft)
+    # The persisted draft names the fields that were filled; the values stay
+    # in the 0600 profile and are never duplicated into a second store.
+    write_draft(
+        drafts_dir(config),
+        app_id_for(fingerprint),
+        draft_payload(
+            {
+                "fingerprint": fingerprint,
+                "current_url": page.url,
+                "jk": job.jk,
+                "title": job.title,
+                "company": job.company,
+                "location": job.location,
+            },
+            draft,
+        ),
+    )
+
+    # A challenge can appear while the form is being filled; re-check before
+    # anything is submitted so a wall is never pushed through.
+    challenge = indeed_form.detect_challenge(page)
+    if challenge:
+        ledger.mark(fingerprint, "blocked", f"challenge:{challenge}")
+        raise ApplyBlockedError(challenge, page.url)
 
     if dry_run:
         # A rehearsal must not consume the posting: release the reservation so
