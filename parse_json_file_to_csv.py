@@ -1,54 +1,42 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
+"""Convert a scraper JSON dump into a CSV file.
 
-import json
-import csv
-import re
+Defaults to the newest JSON in the state output directory; pass a path to
+convert a specific file. Handles both the structured format written today and
+the legacy list-of-Text-blocks format from the Selenium era.
+"""
 
-def parse_job_info(job_data):
-    parsed_jobs = []
-    for job in job_data:
-        job_info = {}
-        text = job.get("Text", "")
-        job_link = job.get("JobLink", "")
-        
-        # Extract title, company, location, salary, schedule
-        title_match = re.search(r"^(.+?)\n", text)
-        company_match = re.search(r"\n(.+?)\n", text)
-        location_match = re.search(r"\n(.+?)(?:\n|$)", text.split("\n")[2])
-        salary_match = re.search(r"(\$[\d,.]+(?: - \$[\d,.]+)?(?: a year| an hour)?)", text)
-        schedule_match = re.search(r"(Full-time|Part-time|Monday to Friday|Weekend availability)", text)
-        
-        # Extract additional information
-        job_number_match = re.search(r"Job Number: (\d+)", text)
-        posted_date_match = re.search(r"Posted (\d+ days ago)", text)
-        job_description_match = re.search(r"Description (.+?)(?:\n|$)", text)
-        
-        job_info["Title"] = title_match.group(1) if title_match else ""
-        job_info["Company"] = company_match.group(1) if company_match else ""
-        job_info["Location"] = location_match.group(1) if location_match else ""
-        job_info["Salary"] = salary_match.group(1) if salary_match else ""
-        job_info["Schedule"] = schedule_match.group(1) if schedule_match else ""
-        job_info["Job Number"] = job_number_match.group(1) if job_number_match else ""
-        job_info["Posted Date"] = posted_date_match.group(1) if posted_date_match else ""
-        job_info["Job Description"] = job_description_match.group(1) if job_description_match else ""
-        job_info["JobLink"] = job_link  # Add the job link
-        
-        parsed_jobs.append(job_info)
-    return parsed_jobs
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+from indeed_scraper.config import Config
+from indeed_scraper.export import load_jobs, records_to_csv
+
+
+def find_input() -> Path:
+    if len(sys.argv) > 1:
+        return Path(sys.argv[1])
+    output_dir = Config.load().output_dir
+    candidates = sorted(
+        [*output_dir.glob("jobs_*.json"), *Path.cwd().glob("log_*.json")],
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    if not candidates:
+        raise SystemExit("No JSON file found; pass one explicitly.")
+    return candidates[0]
+
+
+def main() -> int:
+    source = find_input()
+    records = load_jobs(source)
+    destination = source.with_name("job_data_extended.csv")
+    records_to_csv(records, destination)
+    print(f"Wrote {len(records)} rows from {source} to {destination}")
+    return 0
+
 
 if __name__ == "__main__":
-    # Load JSON data from file
-    with open("job_data.json", "r") as f:
-        job_data = json.load(f)
-    
-    # Parse job information
-    parsed_jobs = parse_job_info(job_data)
-    
-    # Write to CSV
-    with open("job_data_extended.csv", "w", newline="") as csvfile:
-        fieldnames = ["Title", "Company", "Location", "Salary", "Schedule", "Job Number", "Posted Date", "Job Description", "JobLink"]
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        
-        writer.writeheader()
-        for job in parsed_jobs:
-            writer.writerow(job)
+    raise SystemExit(main())

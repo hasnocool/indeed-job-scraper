@@ -1,75 +1,138 @@
-**README.md**
-================================
+# Indeed Job Scraper
 
-**Indeed Job Scraper**
-======================
+Collects job listings from Indeed for a set of locations, driven by a real,
+signed-in browser session.
 
-**Project Title**: Indeed Job Scraper
-----------------------------------------
+**Default scope:** every job (**no keyword filter**) in **Ucluelet, BC**,
+**Tofino, BC** and **Port Alberni, BC** on ca.indeed.com.
 
-I built this to automate the process of scraping job listings from Indeed.com, making it easier to collect and analyze data on job postings in a specific location. This project leverages web scraping techniques using Selenium and JSON parsing with Python.
+The scraper signs a human in once, saves the resulting cookie list, reuses it
+until it expires, and asks for a fresh sign-in only when Indeed rejects it.
 
-**Description**
----------------
+## How it works
 
-Indeed Job Scraper is designed to fetch job listings from Indeed.com based on specified criteria (e.g., sponsorship, Chicago, IL), then parse the extracted data into a more structured format (JSON) for further analysis. The tool includes rate limiting to prevent overloading the website and ensure smooth operation.
+1. **Sign in (once).** login opens a visible Chromium window at Indeed. You
+   sign in (email/password, Google or Apple, 2FA if enabled). The moment Indeed
+   issues the SESS session cookie the flow captures the whole Indeed cookie
+   list and writes it to disk.
+2. **Use it until it expires.** scrape loads that cookie list into a persistent
+   Chromium profile and runs the search. Cookies are re-captured after every
+   run, so rotations are recorded against the same session.
+3. **Detect expiry.** Cookies carry their own expiry timestamps; the session is
+   considered unusable shortly before the earliest auth cookie expires, and an
+   Indeed redirect to secure.indeed.com/auth means the session was revoked.
+   Either way the scraper stops, marks the session, and offers a fresh sign-in
+   instead of silently returning partial results.
 
-**Features**
-------------
+## Install
 
-*   **Web Scraping**: Utilizes Selenium to fetch job listings from Indeed.com.
-*   **Rate Limiting**: Includes a retry mechanism with delays to avoid overwhelming the website.
-*   **JSON Output**: Exports extracted data in JSON format for further processing.
-*   **CSV Conversion**: Optionally, parses JSON output into a CSV file.
+    python3 -m pip install -r requirements.txt
+    python3 -m playwright install chromium   # only if the browser is missing
+    python3 -m indeed_scraper doctor         # checks browser, network, session
 
-**Installation**
-----------------
+## Quick start
 
-### Prerequisites
+    # 1. Sign in to Indeed (a browser window opens; finish there)
+    python3 -m indeed_scraper login
 
-*   Python 3.x (preferably 3.9 or later)
-*   Selenium WebDriver (ChromeDriver)
-*   json and csv libraries
+    # 2. Scrape all jobs in the three default BC locations
+    python3 -m indeed_scraper scrape
 
-### Installation Steps
+    # 3. Inspect the saved session / cookie list / expiry
+    python3 -m indeed_scraper status
+    python3 -m indeed_scraper cookies --json
 
-1.  Clone this repository using Git.
-2.  Install required libraries using pip: `pip install selenium`
-3.  Download the ChromeDriver from [here](https://chromedriver.chromium.org/downloads) and add it to your system's PATH.
+The legacy entry point still works and forwards every flag to scrape:
 
-**Usage**
-----------
+    python3 job_scraper_with_rate_limiting.py --pages 2
 
-### Running the Scraper
+## Commands
 
-1.  Execute the `job_scraper_with_rate_limiting.py` script.
-2.  The tool will fetch job listings based on the specified criteria (sponsorship, Chicago, IL).
-3.  It will parse extracted data into JSON format and save it to a file named `log_{timestamp}.json`.
+| Command | Purpose |
+| --- | --- |
+| login | Open a browser and wait for you to sign in; save the cookie list. |
+| verify | Confirm Indeed still accepts the saved cookies. |
+| scrape | Search the locations with the saved session and write JSON/CSV. |
+| status | Show the session, expiry and recent cookie history. |
+| cookies | Print the cookie list in use (--json for the raw list). |
+| doctor | Check Python, Playwright, Chromium, state dir and Indeed reachability. |
 
-### Optional CSV Conversion
+## Search options
 
-1.  After running the scraper, execute the `parse_json_file_to_csv.py` script.
-2.  This will convert the JSON output from the previous step into a CSV file named `job_data_extended.csv`.
+    python3 -m indeed_scraper scrape \
+      --location "Ucluelet, BC" \
+      --location "Tofino, BC" \
+      --location "Port Alberni, BC" \
+      --location "Nanaimo, BC" \
+      --pages 5 \
+      --delay 8
 
-**Contributing**
----------------
+| Option | Default | Meaning |
+| --- | --- | --- |
+| --query/-q | empty | Keywords. Empty means every job. |
+| --location/-l | Ucluelet, Tofino, Port Alberni | Repeatable; results are deduped across locations. |
+| --pages/-n | 10 | Maximum result pages per location. |
+| --site | ca.indeed.com | Indeed host; www.indeed.com for US searches. |
+| --delay | 7 s | Pause between result pages (keep it at 5 s or more). |
+| --headless | off | Headless is usually blocked by Indeed/Cloudflare. |
+| --csv | on | Also write jobs_latest.csv. |
+| --relogin | on | Sign in again automatically if the session is rejected. |
 
-Contributions are welcome! If you'd like to enhance this project or add new features, please follow these steps:
+A page that redirects to the sign-in wall stops the run with a clear
+"session no longer valid" error instead of returning partial results.
 
-1.  Fork this repository on GitHub.
-2.  Make your changes in a new branch (e.g., `feature/new-feature`).
-3.  Commit your changes with descriptive commit messages.
-4.  Submit a pull request for review.
+## Where things are stored
 
-**License**
-----------
+Everything lives under .indeed-state/ (git-ignored):
 
-Indeed Job Scraper is released under the [MIT License](https://opensource.org/licenses/MIT).
+    .indeed-state/
+    +-- chrome-profile/            persistent Chromium profile (keeps cf_clearance)
+    +-- cookies/
+    |   +-- current.json           the cookie list currently in use
+    |   +-- sessions/*.json        every session snapshot ever captured
+    |   +-- history.jsonl          append-only log: saved / refreshed / expired / revoked
+    +-- output/
+        +-- jobs_<timestamp>.json  structured results for one run (per-location stats)
+        +-- jobs_latest.json       most recent run
+        +-- jobs_latest.csv        most recent run as CSV
 
-**Tags/Keywords**
------------------
+Set INDEED_STATE_DIR or INDEED_SITE to relocate state or target a different
+Indeed host.
 
-Indeed, web scraping, Selenium, rate limiting, JSON parsing, CSV conversion
+### Cookie expiry model
 
-[![Python Version](https://img.shields.io/badge/Python-3.x-green.svg)](https://www.python.org/)
-[![Selenium](https://img.shields.io/badge/Selenium-4.0-green.svg)](https://selenium.dev/)
+- **Expiry:** the earliest expiry among auth cookies (SESS, CTK, SUB, LV, LD,
+  UIMF, IRS, CSRF). When auth cookies are browser-session cookies, the expiry is
+  unknown and the session is used until Indeed rejects it.
+- **Rotation:** every save/refresh is appended to history.jsonl; rotated cookie
+  names are listed on refresh events.
+- **Revocation:** an Indeed redirect to secure.indeed.com/auth marks the session
+  revoked and triggers re-login (unless --no-relogin).
+- **Privacy:** the cookie list is a credential - keep .indeed-state/ private and
+  out of version control.
+
+## CSV conversion
+
+    python3 parse_json_file_to_csv.py                       # newest output JSON
+    python3 parse_json_file_to_csv.py .indeed-state/output/jobs_20261020-195619.json
+
+## Project layout
+
+    indeed_scraper/
+    +-- cli.py        typer commands
+    +-- config.py     paths, search scope, pacing
+    +-- cookies.py    typed cookies, session store, expiry, history
+    +-- browser.py    Playwright profile + challenge detection
+    +-- auth.py       interactive sign-in, session capture, reuse/verify
+    +-- scraper.py    multi-location search, extraction, dedupe
+    +-- export.py     JSON/CSV writers
+    +-- errors.py     typed failures
+    tests/            cookie store, export and search-scope tests
+
+## Notes
+
+- Indeed requires a signed-in session for pagination and increasingly gates
+  bot-like traffic behind Cloudflare. The scraper therefore runs a visible
+  browser, paces pages, and lets you clear any challenge by hand.
+- Keep the page delay at 5 seconds or more and avoid parallel runs.
+- Scraping is subject to Indeed's Terms of Service; use for personal research.

@@ -1,0 +1,17 @@
+# scraper state: browser profile, cookie lists, outputs
+.indeed-state/
+# persistent data workspace (cookies and profiles are secrets; outputs are regenerable)
+data/
+# tool artifacts
+.graphflow/
+graphflow-out/
+.ruff_cache/
+.pytest_cache/
+.file_contents_output/
+.repo_summary/
+.venv/
+__pycache__/
+*.pyc
+log_*.txt
+log_*.json
+job_data_extended.csv
