@@ -71,18 +71,55 @@ class RiskBudget:
         return max(0.0, remaining)
 
     @classmethod
-    def config_from_env(cls) -> RiskBudget:
-        """Read from env vars, fall back to defaults; ignores bad values."""
-        try:
-            val = os.environ.get("INDEED_MAX_APPS_PER_DAY")
-            max_per_day = int(val) if val and val.isdigit() else cls.__dataclass_fields__["max_per_day"].default
-        except (ValueError, TypeError):
-            max_per_day = cls.__dataclass_fields__["max_per_day"].default
+    def from_policy(cls, max_per_day: int, min_delay_minutes: float) -> RiskBudget:
+        """The operator's policy, with the environment able to TIGHTEN it.
 
-        try:
-            val = os.environ.get("INDEED_MIN_DELAY_MINUTES")
-            min_delay = float(val) if val else cls.__dataclass_fields__["min_delay_minutes"].default
-        except (ValueError, TypeError):
-            min_delay = cls.__dataclass_fields__["min_delay_minutes"].default
+        The policy file is the ceiling. The environment may lower the daily
+        cap or raise the delay for one run, and may not raise the cap or
+        shorten the delay.
+        """
+        return cls.config_from_env(
+            cls(max_per_day=max_per_day, min_delay_minutes=min_delay_minutes)
+        )
+
+    @classmethod
+    def config_from_env(cls, ceiling: RiskBudget | None = None) -> RiskBudget:
+        """Read the budget from the environment, ignoring unusable values.
+
+        With a ``ceiling``, the environment can only make the budget
+        STRICTER: it may lower the daily cap and raise the delay, never
+        raise the cap or shorten the delay. That mirrors the command-line
+        flags, and it keeps the operator's policy file the ceiling.
+
+        Without a ``ceiling`` the environment value is used as it stands,
+        and an unusable value falls back to the class defaults.
+        """
+        base = ceiling if ceiling is not None else cls()
+        max_per_day = base.max_per_day
+        min_delay = base.min_delay_minutes
+
+        raw = os.environ.get("INDEED_MAX_APPS_PER_DAY", "").strip()
+        if raw:
+            try:
+                parsed = int(raw)
+            except ValueError:
+                parsed = None
+            if parsed is not None and parsed >= 0:
+                if ceiling is None:
+                    max_per_day = parsed
+                else:
+                    max_per_day = min(base.max_per_day, parsed)
+
+        raw = os.environ.get("INDEED_MIN_DELAY_MINUTES", "").strip()
+        if raw:
+            try:
+                parsed = float(raw)
+            except ValueError:
+                parsed = None
+            if parsed is not None and parsed >= 0:
+                if ceiling is None:
+                    min_delay = parsed
+                else:
+                    min_delay = max(base.min_delay_minutes, parsed)
 
         return cls(max_per_day=max_per_day, min_delay_minutes=min_delay)

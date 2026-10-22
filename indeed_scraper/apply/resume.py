@@ -104,9 +104,9 @@ def resume_application(
         return None
 
     rules = policy or AutonomyPolicy()
-    budget = risk_budget or RiskBudget(
-        max_per_day=rules.max_applications_per_day,
-        min_delay_minutes=rules.min_delay_minutes,
+    budget = risk_budget or RiskBudget.from_policy(
+        rules.max_applications_per_day,
+        rules.min_delay_minutes,
     )
     needs_confirm = confirm and not rules.allows_submit
     validate_resume(Path(profile.resume_path).expanduser())

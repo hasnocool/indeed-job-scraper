@@ -314,7 +314,12 @@ raises a `FieldMissingError` naming the question instead.
 - **Rate limited:** `RiskBudget` caps applications per day (2 by default) and
   enforces a minimum delay between submissions. An `unconfirmed` attempt counts
   against the cap, because a click that may have gone out cannot be un-sent.
-  Tune with `INDEED_MAX_APPS_PER_DAY` and `INDEED_MIN_DELAY_MINUTES`.
+  The cap and the delay are set in the operator's policy file
+  (`max_applications_per_day` and `min_delay_minutes`), which is the ceiling.
+  `INDEED_MAX_APPS_PER_DAY` and `INDEED_MIN_DELAY_MINUTES` may **tighten** that
+  ceiling for a single run — they can lower the cap and raise the delay, but
+  never raise the cap or shorten the delay. A command-line flag
+  (`--max-per-day`, `--min-delay`) behaves the same way.
 
 ### Exit codes
 

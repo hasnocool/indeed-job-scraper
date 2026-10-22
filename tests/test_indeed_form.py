@@ -35,11 +35,25 @@ class _FakeLocator:
     sensible defaults so that the real indeed_form.py logic works without a
     full browser. Tests can override _visible if they want to simulate
     invisibility, but the defaults allow the common cases to pass.
+
+    The ATTRIBUTES are honest: a field is only required when the markup the
+    test declared actually carries the attribute. The old fake returned
+    "required" for every visible locator, so it could not express an
+    optional field, and it could not exercise the bare-boolean-attribute
+    case (``required`` with no value) that the real browser reports as the
+    EMPTY STRING. That lie made the fake unable to catch the bug it was
+    standing in for.
     """
 
-    def __init__(self, visible: bool = True, value: str = "") -> None:
+    def __init__(
+        self,
+        visible: bool = True,
+        value: str = "",
+        attributes: dict[str, str] | None = None,
+    ) -> None:
         self._visible = visible
         self._value = value
+        self._attributes: dict[str, str] = dict(attributes or {})
 
     @property
     def first(self):
@@ -60,35 +74,81 @@ class _FakeLocator:
     def text_content(self) -> str | None:
         return self._value if self._value else None
 
+    def set_attributes(self, attributes: dict[str, str]) -> None:
+        self._attributes = dict(attributes)
+
     def get_attribute(self, name: str) -> str | None:
-        if name == "required":
-            return "required" if self._visible else None
-        if name == "aria-required":
-            return "true" if self._visible else None
+        if name in {"required", "aria-required"}:
+            # None means the attribute is ABSENT, which is what a browser
+            # reports for an input that does not carry it. A bare `required`
+            # reads as the empty string, and `aria-required` as its value.
+            return self._attributes.get(name)
         if name == "aria-label":
             return self._value if self._value else None
         return None
 
 
 class _FakePage:
-    """Minimal fake Playwright Page for testing."""
+    """Minimal fake Playwright Page for testing.
+
+    ``set_content`` parses the markup the test declared, so the fake knows
+    WHICH inputs carry ``required`` / ``aria-required`` instead of assuming
+    that every visible field is required.
+    """
 
     def __init__(self, url: str = "https://ca.indeed.com/viewjob?jk=test") -> None:
         self.url = url
         self._locators: dict[str, _FakeLocator] = {}
         self._title = ""
+        self._attributes: dict[str, dict[str, str]] = {}
 
     def set_content(self, content: str, *args, **kwargs) -> None:
         """Store content and extract basic DOM info for testing."""
         self._content = content
         import re
+
         m = re.search(r"<title>(.*?)</title>", content, re.IGNORECASE)
         self._title = m.group(1) if m else ""
+        self._attributes = self._parse_attributes(content)
+
+    @staticmethod
+    def _parse_attributes(content: str) -> dict[str, dict[str, str]]:
+        """Map the selectors of required inputs to the attributes they carry.
+
+        The selectors are the ones the form filler actually looks for:
+        ``input[name="..."]`` and ``input#...``.
+        """
+        import re
+
+        found: dict[str, dict[str, str]] = {}
+        for tag in re.findall(r"<input\b[^>]*>", content, re.IGNORECASE):
+            selectors: list[str] = []
+            name = re.search(r'name="([^"]+)"', tag)
+            if name:
+                selectors.append(f'input[name="{name.group(1)}"]')
+            ident = re.search(r'id="([^"]+)"', tag)
+            if ident:
+                selectors.append(f'input#{ident.group(1)}')
+            attributes: dict[str, str] = {}
+            # A bare `required` attribute. The lookarounds keep it from
+            # matching inside `aria-required`, which is a different
+            # attribute with its own value.
+            if re.search(r"(?<![-\w])required(?![-\w])", tag, re.IGNORECASE):
+                # A real browser reports a bare `required` as the EMPTY STRING.
+                attributes["required"] = ""
+            aria = re.search(r'aria-required="([^"]*)"', tag, re.IGNORECASE)
+            if aria:
+                attributes["aria-required"] = aria.group(1)
+            for selector in selectors:
+                found[selector] = attributes
+        return found
 
     def locator(self, selector: str) -> _FakeLocator:
         if selector not in self._locators:
             self._locators[selector] = _FakeLocator(visible=True)
-        return self._locators[selector]
+        locator = self._locators[selector]
+        locator.set_attributes(self._attributes.get(selector, {}))
+        return locator
 
     def title(self) -> str:
         return self._title
@@ -282,6 +342,70 @@ def test_fill_indeed_form_raises_field_missing_for_required() -> None:
     assert excinfo.value.job_url, "FieldMissingError .job_url must be non-empty"
     assert isinstance(excinfo.value.question, str)
     assert isinstance(excinfo.value.job_url, str)
+
+
+def test_a_bare_required_attribute_is_treated_as_required() -> None:
+    """A bare `required` (no value) is REQUIRED.
+
+    A real browser reports a bare boolean attribute as the EMPTY STRING, so a
+    check on the TRUTHINESS of the value calls an empty required field
+    optional - and the hard-refuse never fires. The presence of the attribute
+    is what matters.
+    """
+    page = _make_page("https://ca.indeed.com/apply/in/test123")
+    page.set_content(
+        '<html><head><title>Apply</title></head>'
+        "<body>"
+        '  <input type="text" name="applicant.name" required>'
+        "</body></html>"
+    )
+
+    profile = _make_profile(name="")
+    with pytest.raises(FieldMissingError):
+        fill_indeed_form(page, profile)
+
+
+def test_an_input_without_the_attribute_is_not_required() -> None:
+    """The mirror image: an input that does NOT carry `required` is optional.
+
+    The old fake reported EVERY visible locator as required, so it could not
+    express this case at all, and a check that treated every field as
+    required would have passed it.
+    """
+    page = _make_page("https://ca.indeed.com/apply/in/test123")
+    page.set_content(
+        '<html><head><title>Apply</title></head>'
+        "<body>"
+        '  <input type="text" name="applicant.name">'
+        "</body></html>"
+    )
+
+    profile = _make_profile(name="")
+    draft = fill_indeed_form(page, profile)
+
+    assert "name" not in draft, f"an optional field must not be claimed: {draft!r}"
+
+
+def test_aria_required_true_is_required_and_false_is_not() -> None:
+    """`aria-required="true"` is required; `aria-required="false"` is not."""
+    page = _make_page("https://ca.indeed.com/apply/in/test123")
+    page.set_content(
+        '<html><head><title>Apply</title></head>'
+        "<body>"
+        '  <input type="text" name="applicant.name" aria-required="true">'
+        "</body></html>"
+    )
+    with pytest.raises(FieldMissingError):
+        fill_indeed_form(page, _make_profile(name=""))
+
+    page.set_content(
+        '<html><head><title>Apply</title></head>'
+        "<body>"
+        '  <input type="text" name="applicant.name" aria-required="false">'
+        "</body></html>"
+    )
+    draft = fill_indeed_form(page, _make_profile(name=""))
+    assert "name" not in draft, f"an optional field must not be claimed: {draft!r}"
 
 
 def test_fill_indeed_form_raises_field_missing_for_missing_resume() -> None:

@@ -171,9 +171,9 @@ def apply_to_jobs(
 ) -> list[ApplyResult]:
     """Apply to postings from the master dataset, one guarded job at a time."""
     rules = policy or AutonomyPolicy()
-    budget = risk_budget or RiskBudget(
-        max_per_day=rules.max_applications_per_day,
-        min_delay_minutes=rules.min_delay_minutes,
+    budget = risk_budget or RiskBudget.from_policy(
+        rules.max_applications_per_day,
+        rules.min_delay_minutes,
     )
     # The policy may allow an unattended submission; the confirm gate then
     # only applies when the policy keeps it.

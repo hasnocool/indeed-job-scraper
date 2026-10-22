@@ -301,6 +301,42 @@ def test_risk_config_from_env_falls_back_on_garbage(tmp_path: Path) -> None:
     del _os.environ["INDEED_MIN_DELAY_MINUTES"]
 
 
+def test_risk_from_policy_lets_the_environment_only_tighten_it() -> None:
+    """The policy file is the CEILING; the environment may only tighten it.
+
+    An environment that tries to raise the daily cap or shorten the delay
+    must not loosen the operator's standing decision. The environment that
+    makes the budget STRICTER must be honoured.
+    """
+    import os as _os
+
+    ceiling = RiskBudget(max_per_day=2, min_delay_minutes=30.0)
+
+    # Tries to RAISE the cap and SHORTEN the delay: both are refused.
+    _os.environ["INDEED_MAX_APPS_PER_DAY"] = "9999"
+    _os.environ["INDEED_MIN_DELAY_MINUTES"] = "0"
+    try:
+        budget = RiskBudget.from_policy(ceiling.max_per_day, ceiling.min_delay_minutes)
+        assert budget.max_per_day == ceiling.max_per_day, "the environment raised the daily cap"
+        assert budget.min_delay_minutes == ceiling.min_delay_minutes, (
+            "the environment shortened the delay"
+        )
+    finally:
+        del _os.environ["INDEED_MAX_APPS_PER_DAY"]
+        del _os.environ["INDEED_MIN_DELAY_MINUTES"]
+
+    # Tightens both: both are applied.
+    _os.environ["INDEED_MAX_APPS_PER_DAY"] = "1"
+    _os.environ["INDEED_MIN_DELAY_MINUTES"] = "60"
+    try:
+        budget = RiskBudget.from_policy(ceiling.max_per_day, ceiling.min_delay_minutes)
+        assert budget.max_per_day == 1, "a stricter daily cap was ignored"
+        assert budget.min_delay_minutes == 60.0, "a longer delay was ignored"
+    finally:
+        del _os.environ["INDEED_MAX_APPS_PER_DAY"]
+        del _os.environ["INDEED_MIN_DELAY_MINUTES"]
+
+
 # ---------------------------------------------------------------------------
 # Drafts tests
 # ---------------------------------------------------------------------------
