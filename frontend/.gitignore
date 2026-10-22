@@ -1,0 +1,8 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+node_modules/.vite/
+.DS_Store
+*.tsbuildinfo

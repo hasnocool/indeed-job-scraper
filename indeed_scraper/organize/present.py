@@ -50,3 +50,31 @@ def print_master(result: dict[str, dict], console: Console) -> None:
         table.add_row(short, company, title, location, salary, posted, status)
 
     console.print(table)
+
+    _print_field_completeness(result, console)
+
+
+def _print_field_completeness(result: dict[str, dict], console: Console) -> None:
+    """Print a per-field fill-rate summary so extraction drift is visible.
+
+    Read-only presentation: does not alter the on-disk master schema.
+    """
+    fields = ("title", "company", "location", "salary", "schedule", "posted", "snippet", "url")
+    total = len(result)
+    if total == 0:
+        console.print("[yellow]Field completeness: no jobs to summarize.[/yellow]")
+        return
+
+    table = Table(title="Field Completeness (fill rate)", show_header=True)
+    table.add_column("Field", style="cyan")
+    table.add_column("Fill rate", justify="center")
+    table.add_column("Populated", justify="center")
+    table.add_column("Empty", justify="center")
+
+    for field in fields:
+        populated = sum(1 for s in result.values() if str(getattr(s["job"], field)).strip())
+        empty = total - populated
+        rate = populated / total * 100
+        table.add_row(field, f"{rate:.0f}%", str(populated), str(empty))
+
+    console.print(table)

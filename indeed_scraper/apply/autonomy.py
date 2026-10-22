@@ -9,10 +9,19 @@ Levels
 ``manual``
     Every submission is confirmed by the operator. Replies are never sent.
 ``auto``
-    Submissions happen without a prompt, inside the risk budget. Replies are
-    still drafted for the operator.
+    Submissions MAY happen without a prompt, inside the risk budget. Replies
+    are still drafted for the operator.
 ``full``
-    Submissions and replies are sent without a prompt, inside the risk budget.
+    Submissions and replies MAY be sent without a prompt, inside the risk
+    budget.
+
+The level is a PERMISSION, not a decision. An unattended submit of a real
+application also needs the separate ``unattended_submit`` switch, which is
+OFF by default and is only enabled by writing it in the policy file. That
+matters because the level alone used to be enough: with a policy file saying
+``"level": "full"`` the operator's real applications went out with no prompt
+at all, which is exactly what HC-4 forbids. A flag can never turn the switch
+on - only the operator's own policy file can.
 
 One thing stays gated in every level unless the operator explicitly opts in:
 a reply that ACCEPTS an offer or agrees to contractual terms. That is a binding
@@ -29,7 +38,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from ..errors import IndeedScraperError
 
@@ -38,6 +47,35 @@ AutonomyLevel = Literal["manual", "auto", "full"]
 LEVELS: tuple[AutonomyLevel, ...] = ("manual", "auto", "full")
 POLICY_ENV = "INDEED_AUTONOMY"
 POLICY_FILENAME = "policy.json"
+
+
+def _coerce_int(value: Any, key: str, path: Path) -> int:
+    """Coerce a policy value to int, or fail with an operator-facing message."""
+    try:
+        return int(value)
+    except (TypeError, ValueError) as error:
+        raise IndeedScraperError(
+            f"Invalid {key} {value!r} in policy file {path}: must be a whole number"
+        ) from error
+
+
+def _coerce_float(value: Any, key: str, path: Path) -> float:
+    """Coerce a policy value to float, or fail with an operator-facing message."""
+    try:
+        return float(value)
+    except (TypeError, ValueError) as error:
+        raise IndeedScraperError(
+            f"Invalid {key} {value!r} in policy file {path}: must be a number"
+        ) from error
+
+
+def _coerce_bool(value: Any, key: str, path: Path) -> bool:
+    """Coerce a policy value to bool; anything but a real true/false is rejected."""
+    if isinstance(value, bool):
+        return value
+    raise IndeedScraperError(
+        f"Invalid {key} {value!r} in policy file {path}: must be true or false"
+    )
 
 
 def policy_path() -> Path:
@@ -56,6 +94,7 @@ class AutonomyPolicy:
     max_applications_per_day: int = 2
     min_delay_minutes: float = 30.0
     allow_binding_commitments: bool = False
+    unattended_submit: bool = False
 
     # ------------------------------------------------------------------
     # Loading
@@ -102,11 +141,26 @@ class AutonomyPolicy:
             raise IndeedScraperError(
                 f"Policy level {level!r} in {target} is not one of {', '.join(LEVELS)}"
             )
+        max_applications_per_day = _coerce_int(
+            data.get("max_applications_per_day", 2), "max_applications_per_day", target
+        )
+        min_delay_minutes = _coerce_float(
+            data.get("min_delay_minutes", 30.0), "min_delay_minutes", target
+        )
+        allow_binding_commitments = _coerce_bool(
+            data.get("allow_binding_commitments", False),
+            "allow_binding_commitments",
+            target,
+        )
+        unattended_submit = _coerce_bool(
+            data.get("unattended_submit", False), "unattended_submit", target
+        )
         return cls(
             level=level,  # type: ignore[arg-type]
-            max_applications_per_day=int(data.get("max_applications_per_day", 2)),
-            min_delay_minutes=float(data.get("min_delay_minutes", 30.0)),
-            allow_binding_commitments=bool(data.get("allow_binding_commitments", False)),
+            max_applications_per_day=max_applications_per_day,
+            min_delay_minutes=min_delay_minutes,
+            allow_binding_commitments=allow_binding_commitments,
+            unattended_submit=unattended_submit,
         )
 
     def save(self, path: Path | None = None) -> Path:
@@ -114,13 +168,14 @@ class AutonomyPolicy:
         target = path or policy_path()
         target.parent.mkdir(parents=True, exist_ok=True)
         target.parent.chmod(0o700)
+        tmp = target.with_suffix(".tmp")
         payload = {
             "level": self.level,
             "max_applications_per_day": self.max_applications_per_day,
             "min_delay_minutes": self.min_delay_minutes,
             "allow_binding_commitments": self.allow_binding_commitments,
+            "unattended_submit": self.unattended_submit,
         }
-        tmp = target.with_suffix(".tmp")
         tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         tmp.chmod(0o600)
         os.replace(tmp, target)
@@ -132,8 +187,12 @@ class AutonomyPolicy:
 
     @property
     def allows_submit(self) -> bool:
-        """True when a submission needs no prompt."""
-        return self.level in {"auto", "full"}
+        """True when a submission needs no prompt.
+
+        The policy level is only a permission: an unattended submit also
+        requires the explicit ``unattended_submit`` switch.
+        """
+        return self.level in {"auto", "full"} and self.unattended_submit
 
     @property
     def allows_reply(self) -> bool:
@@ -161,13 +220,20 @@ class AutonomyPolicy:
             max_applications_per_day=self.max_applications_per_day,
             min_delay_minutes=self.min_delay_minutes,
             allow_binding_commitments=self.allow_binding_commitments,
+            unattended_submit=self.unattended_submit,
         )
 
     def describe(self) -> str:
-        """A one-line human summary."""
+        """A one-line human summary.
+
+        The unattended-submit switch is shown explicitly because it is the
+        difference between "the operator is asked" and "a real application
+        goes out with no prompt" - the operator must be able to see it.
+        """
         return (
             f"level={self.level} "
             f"max/day={self.max_applications_per_day} "
             f"min_delay={self.min_delay_minutes}m "
-            f"binding_commitments={'auto' if self.allow_binding_commitments else 'gated'}"
+            f"binding_commitments={'auto' if self.allow_binding_commitments else 'gated'} "
+            f"unattended_submit={'ON' if self.unattended_submit else 'off'}"
         )

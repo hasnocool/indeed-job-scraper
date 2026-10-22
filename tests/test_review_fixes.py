@@ -57,10 +57,19 @@ def _profile() -> Profile:
 
 
 def test_the_cli_help_does_not_claim_a_mandatory_confirmation() -> None:
-    """The help must describe what the code does, not the other way round."""
-    source = Path("indeed_scraper/cli.py").read_text(encoding="utf-8")
-    assert "ALWAYS requires the operator to confirm" not in source
-    assert "there is no" not in source.split("def apply(")[1].split('"""')[1]
+    """The help must describe what the code does, not the other way round.
+
+    The ``apply`` command body now lives in
+    ``indeed_scraper/commands/apply_cmds.py`` (it was moved out of
+    ``cli.py`` to keep that module a thin wiring layer), so the check reads
+    the command's real home.
+    """
+    command = Path("indeed_scraper/commands/apply_cmds.py").read_text(encoding="utf-8")
+    assert "ALWAYS requires the operator to confirm" not in command
+    assert "there is no" not in command.split("def apply(")[1].split('"""')[1]
+    # The CLI wiring module must not carry a stale copy of the command.
+    cli_source = Path("indeed_scraper/cli.py").read_text(encoding="utf-8")
+    assert "ALWAYS requires the operator to confirm" not in cli_source
 
 
 def test_the_policy_file_is_the_ceiling_on_autonomy(tmp_path: Path) -> None:

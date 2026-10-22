@@ -53,6 +53,19 @@ def is_indeed_domain(domain: str) -> bool:
     return domain.lstrip(".").endswith(INDEED_DOMAIN_SUFFIX)
 
 
+def _chmod_quiet(path: Path, mode: int) -> None:
+    """Set a file's mode, ignoring a filesystem that refuses.
+
+    A filesystem that does not support POSIX modes (a Windows share, some
+    FUSE mounts) must not break the login flow, but the caller has already
+    created the file with the right mode via ``os.open``.
+    """
+    try:
+        os.chmod(path, mode)
+    except OSError:
+        pass
+
+
 class Cookie(BaseModel):
     """One browser cookie, mirroring Playwright's shape."""
 
@@ -268,12 +281,51 @@ class CookieStore:
             **extra,
         }
         path = self._config.history_file
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(record, sort_keys=True) + "\n")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _chmod_quiet(path.parent, 0o700)
+        # The history file records the session, so it is a secret too. It is
+        # CREATED 0600, before a single byte is written: creating it with a
+        # permissive mode and tightening it afterwards leaves a window in
+        # which another local user can read the operator's session.
+        fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        try:
+            _chmod_quiet(path, 0o600)
+            with os.fdopen(fd, "a", encoding="utf-8") as handle:
+                fd = -1  # the handle owns the descriptor now
+                handle.write(json.dumps(record, sort_keys=True) + "\n")
+        finally:
+            if fd != -1:
+                os.close(fd)
 
     @staticmethod
     def _atomic_write(path: Path, text: str) -> None:
+        """Write a secret file atomically, 0600 from the moment it exists.
+
+        The file is created with ``os.open(..., 0o600)``, so it is NEVER
+        world-readable - not even for the instant between the creation and
+        the write. Creating it with ``write_text`` and tightening it
+        afterwards (the old behaviour) left a window in which another local
+        user could read the live Indeed session token.
+        """
         path.parent.mkdir(parents=True, exist_ok=True)
+        # The directory holding the secrets must not be listable by others.
+        _chmod_quiet(path.parent, 0o700)
         temporary = path.with_name(path.name + ".tmp")
-        temporary.write_text(text, encoding="utf-8")
-        os.replace(temporary, path)
+        # Create the temporary file 0600 FIRST, then write into it.
+        fd = os.open(str(temporary), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            _chmod_quiet(temporary, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                fd = -1  # the handle owns the descriptor now
+                handle.write(text)
+        finally:
+            if fd != -1:
+                os.close(fd)
+        try:
+            os.replace(temporary, path)
+        finally:
+            if temporary.exists():
+                temporary.unlink()
+        # An existing file may have been left loose by an older run; tighten
+        # it so a 0644 file never survives a write.
+        _chmod_quiet(path, 0o600)

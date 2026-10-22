@@ -6,14 +6,17 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from indeed_scraper.apply.drafts import app_id_for
+from indeed_scraper.apply.status import RESPONSE_STATUSES, response_status_for
+
 from .store import write_response
 
-RESPONSE_STATUSES = ("applied", "viewed", "interview", "rejected", "withdrawn", "unknown")
-
-
-from indeed_scraper.apply.drafts import (
-    app_id_for,
-)
+__all__ = [
+    "RESPONSE_STATUSES",
+    "app_id_for",
+    "collect_responses",
+    "parse_status",
+]
 
 
 def _now_iso() -> str:
@@ -24,18 +27,17 @@ def _now_iso() -> str:
 def parse_status(text: str) -> str:
     """Map employer-facing status words to one of RESPONSE_STATUSES.
 
+    The real Indeed vocabulary is understood - an offer, a hire, an
+    interview, a rejection, a withdrawal - so `check-responses` tells the
+    operator what actually happened.
+
+    An OFFER keeps its own name. Folding it into "interview" would hide the
+    one status the operator must act on, which is the whole point of the
+    response monitor.
+
     Defaults to "unknown" when the state cannot be determined.
     """
-    lowered = text.strip().lower()
-    if lowered == "interview scheduled":
-        return "interview"
-    if lowered == "application viewed":
-        return "viewed"
-    if lowered == "we have decided not to move forward":
-        return "rejected"
-    if lowered == "":
-        return "unknown"
-    return "unknown"
+    return response_status_for(text)
 
 
 def _status_from_text(text: str) -> str:

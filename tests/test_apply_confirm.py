@@ -44,6 +44,13 @@ class _FakeLocator:
 
     def click(self, timeout: int = 0) -> None:
         self._page.clicks.append(self._selector)
+        # A real submit click navigates to a confirmation page. The fake
+        # models that by giving the page a confirmation title, so the
+        # submit path observes the same success signal a browser does.
+        # A page can opt out (``confirm_on_submit = False``) to model a
+        # click whose outcome cannot be read.
+        if "submit" in self._selector.lower() and self._page.confirm_on_submit:
+            self._page.title_text = "Application Submitted"
 
     def evaluate(self, expression: str) -> None:
         self._page.clicks.append(self._selector)
@@ -66,6 +73,9 @@ class _FakePage:
         self.clicks: list[str] = []
         self.content_html = "<html></html>"
         self.title_text = "Apply"
+        #: Whether a submit click produces a confirmation. Set to False to
+        #: model a click whose outcome cannot be read.
+        self.confirm_on_submit = True
 
     def on_fill(self) -> None:
         """Hook: a subclass may turn the page into a challenge here."""
@@ -205,8 +215,64 @@ def test_an_approved_submission_is_submitted_once(tmp_path: Path) -> None:
     assert page.clicks.count('button:has-text("Submit application")') == 1
 
 
+def test_an_unconfirmed_click_is_not_recorded_as_submitted(tmp_path: Path) -> None:
+    """A click with no confirmation must NOT be recorded as "submitted".
+
+    The old code returned True from a fall-through even when no success
+    signal had been observed, so a submission that never happened was
+    recorded as one - and "submitted" is a TERMINAL ledger state, so the
+    lie was permanent.
+
+    An unconfirmed click is recorded as "unconfirmed": the click went out
+    and may have reached the employer, so the posting must NOT become
+    retryable, but the operator must not be told it was submitted either.
+    """
+
+    class _SilentPage(_FakePage):
+        """A page whose submit click produces no confirmation at all."""
+
+        def __init__(self, url: str, visible: set[str]) -> None:
+            super().__init__(url, visible)
+            self.confirm_on_submit = False
+
+    resume = tmp_path / "resume.pdf"
+    resume.write_bytes(b"%PDF-1.4\n" + b"0 " * 2048)
+    page = _SilentPage(
+        "https://ca.indeed.com/viewjob?jk=jk1",
+        {
+            'input[name="applicant.name"]',
+            'input[name="applicant.email"]',
+            'input[name="applicant.phone"]',
+            'input[type="file"]',
+            'button:has-text("Apply now")',
+            'button:has-text("Submit application")',
+        },
+    )
+    console = _FakeConsole("yes")
+    ledger = ApplicationLedger(tmp_path / "ledger.jsonl")
+
+    result = _apply_one(
+        page,
+        _job(),
+        "fp-unconfirmed",
+        _profile(tmp_path),
+        ledger,
+        _config(tmp_path),
+        console,
+        confirm=True,
+        dry_run=False,
+    )
+
+    assert result.status != "submitted", (
+        f"an unconfirmed click must not be reported as submitted: {result!r}"
+    )
+    assert result.status == "unconfirmed"
+    assert ledger.status_of("fp-unconfirmed") == "unconfirmed"
+    # It went out, so it must NOT be retryable.
+    assert ledger.reserve("fp-unconfirmed", "jk1", "u") is False
+
+
 def test_dry_run_never_submits(tmp_path: Path) -> None:
-    """A rehearsal fills the form and never touches the submit control."""
     page = _page(tmp_path)
     console = _FakeConsole("yes")
     ledger = ApplicationLedger(tmp_path / "ledger.jsonl")

@@ -22,27 +22,35 @@ from typing import Any
 
 from ..errors import IndeedScraperError
 
+__all__ = [
+    "ACTION_REQUIRED",
+    "TRACKER_STATUSES",
+    "TrackerEntry",
+    "action_required",
+    "classify_status",
+    "normalise_text",
+    "read_tracker",
+    "read_tracker_statuses",
+    "record_tracker_status",
+    "strip_location_suffix",
+    "tracker_row_matches",
+]
+
+from .status import (
+    ACTION_REQUIRED,
+    TRACKER_STATUSES,
+    classify_tracker_status,
+    normalise_text,
+    strip_location_suffix,
+    tracker_row_matches,
+)
+
 TRACKER_URL = "https://myjobs.indeed.com/applied"
 STATUS_DATE = '[data-testid="jobStatusDateShort"]'
 UPDATE_STATUS = 'button:has-text("Update status")'
 MENU_SHEET = '[data-testid="actionSheetIFLMenu"]'
 MENU_ITEM = '[data-testid="OverflowMenuItem"]'
 
-#: The status vocabulary Indeed shows, mapped to our own names.
-TRACKER_STATUSES: dict[str, str] = {
-    "offer received": "offer",
-    "hired": "hired",
-    "interviewing": "interview",
-    "no longer interested": "not_interested",
-    "not selected by employer": "not_selected",
-    "application viewed": "viewed",
-    "job closed or expired on indeed": "closed",
-    "applied": "applied",
-}
-
-#: Statuses that mean the operator must act. An offer is never acted on
-#: automatically - it is escalated.
-ACTION_REQUIRED = frozenset({"offer", "hired"})
 
 _JS_ENTRIES = r"""() => {
   const dates = Array.from(document.querySelectorAll('[data-testid="jobStatusDateShort"]'));
@@ -84,12 +92,24 @@ def _is_tab(line: str) -> bool:
 
 
 def classify_status(text: str) -> str:
-    """Map Indeed's status wording to our own status names."""
-    lowered = (text or "").strip().lower()
-    for phrase, name in TRACKER_STATUSES.items():
-        if phrase in lowered:
-            return name
-    return "unknown"
+    """Map Indeed's status wording to our own status names.
+
+    The date line Indeed renders under every card ("Applied on Indeed on
+    Tuesday") is recognised as a DATE and never mistaken for the plain
+    status "applied".
+    """
+    return classify_tracker_status(text)
+
+
+def _is_applied_on(text: str) -> bool:
+    """True for Indeed's "Applied on Indeed on <day>" date line."""
+    lowered = (text or "").strip().casefold()
+    return lowered.startswith("applied on indeed") or " on indeed on " in lowered
+
+
+def tracker_row_matches_entry(record: dict, entry: TrackerEntry) -> bool:
+    """Two-argument matcher kept for existing call sites; normalises both sides."""
+    return tracker_row_matches(record, entry)
 
 
 def open_tracker(page: Any) -> None:
@@ -137,8 +157,14 @@ def read_tracker(page: Any) -> list[TrackerEntry]:
             location = rest[2]
         entries.append(
             TrackerEntry(
-                title=title,
-                company=company,
+                # The title and company are NORMALISED, and the location
+                # suffix Indeed appends to a card title is removed. That is
+                # what makes the mirror fire: the ledger stores the same
+                # normalised form (apply/ledger.py reserve()), so the
+                # comparison the CLI performs is between two equal strings
+                # instead of two spellings of the same posting.
+                title=normalise_text(strip_location_suffix(title)),
+                company=normalise_text(company),
                 location=location,
                 status=classify_status(status_text),
                 status_text=status_text,
@@ -192,10 +218,37 @@ def record_tracker_status(
     title: str = "",
     company: str = "",
 ) -> Path:
-    """Record Indeed's status for one application, in the tracker store."""
+    """Record Indeed's status for one application, in the tracker store.
+
+    The store is append-only, so we make it idempotent by skipping a write
+    when the latest record for the fingerprint already has the same status.
+    """
     path = tracker_status_path(state_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.parent.chmod(0o700)
+
+    # Idempotency check: if the latest entry for this fingerprint already
+    # has the same status, do not append a duplicate.
+    if path.is_file():
+        try:
+            latest_status = None
+            for line in reversed(path.read_text(encoding="utf-8").splitlines()):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(rec, dict) and rec.get("fingerprint") == fingerprint:
+                    latest_status = rec.get("status")
+                    break
+            if latest_status == status:
+                # Already recorded; nothing to do.
+                return path
+        except OSError:
+            pass
+
     record = {
         "fingerprint": fingerprint,
         "status": status,
@@ -214,11 +267,14 @@ def record_tracker_status(
 
 
 def read_tracker_statuses(state_dir: Path) -> list[dict]:
-    """Read the tracker statuses, newest last, skipping malformed lines."""
+    """Read the tracker statuses, newest last, skipping malformed lines.
+
+    Returns one record per fingerprint (the latest).
+    """
     path = tracker_status_path(state_dir)
     if not path.is_file():
         return []
-    records: list[dict] = []
+    seen: dict[str, dict] = {}
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
@@ -228,5 +284,8 @@ def read_tracker_statuses(state_dir: Path) -> list[dict]:
         except json.JSONDecodeError:
             continue
         if isinstance(payload, dict):
-            records.append(payload)
-    return records
+            fp = str(payload.get("fingerprint", ""))
+            if fp:
+                # Overwrite with later entries; iteration is chronological.
+                seen[fp] = payload
+    return list(seen.values())

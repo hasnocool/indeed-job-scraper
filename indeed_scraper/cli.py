@@ -308,196 +308,23 @@ def organize() -> None:
     organize_outputs(config, console)
 
 
-@app.command()
-def apply(
-    limit: int = typer.Option(10, "--limit", "-n", help="Maximum postings to consider."),
-    dry_run: bool = typer.Option(
-        False, "--dry-run", help="Fill the form and record it, but never submit."
-    ),
-    profile_path: Path = typer.Option(  # noqa: B008 - typer's option pattern
-        None, "--profile", help="Profile file (default ~/.config/indeed_scraper/profile.json)."
-    ),
-    autonomy: str = typer.Option(
-        None,
-        "--autonomy",
-        help="manual | auto | full. Overrides the policy file for this run.",
-    ),
-    max_per_day: int = typer.Option(
-        None, "--max-per-day", help="Override the daily application cap for this run."
-    ),
-    min_delay: float = typer.Option(
-        None, "--min-delay", help="Override the minimum delay between submissions (minutes)."
-    ),
-) -> None:
-    """Apply to postings from the organized master dataset.
+def _policy(
+    autonomy: str | None,
+    max_per_day: int | None,
+    min_delay: float | None,
+    policy_path: Path | None = None,
+):
+    """Resolve the autonomy policy: the policy file, with optional overrides.
 
-    Every application is reserved in the ledger before the browser is touched,
-    so a posting is never applied to twice. Whether a submission is confirmed
-    first is decided by the AUTONOMY POLICY
-    (~/.config/indeed_scraper/policy.json):
-
-        manual  every submission is confirmed by the operator
-        auto    submissions are sent unattended, inside the risk budget
-        full    submissions are sent unattended, inside the risk budget
-
-    A reply that accepts an offer is never sent unattended unless the policy
-    explicitly allows binding commitments. A challenge stops the run so the
-    shared session is never poisoned.
+    The policy FILE is the operator's standing decision, so it is the
+    CEILING: a flag may only LOWER the daily cap or LENGTHEN the minimum
+    delay, and may only LOWER the autonomy level. A flag can never raise the
+    file's ceiling, and the unattended-submit switch is not reachable through
+    a level flag at all.
     """
-    from .apply.exceptions import ProfileNotFoundError
-    from .apply.flow import apply_to_jobs
-    from .apply.profile import load_profile
-    from .apply.reporting import write_apply_results
-    from .apply.workspace import ledger_path
+    from .commands.apply_cmds import resolve_policy
 
-    try:
-        profile = load_profile(profile_path)
-    except ProfileNotFoundError as error:
-        console.print(f"[red]{error}[/red]")
-        raise typer.Exit(code=1) from error
-
-    config = _config()
-    store = CookieStore(config)
-    rules = _policy(autonomy, max_per_day, min_delay)
-    console.print(f"[dim]autonomy: {rules.describe()}[/dim]")
-    try:
-        results = apply_to_jobs(
-            config,
-            store,
-            console,
-            profile=profile,
-            limit=limit,
-            confirm=True,
-            dry_run=dry_run,
-            policy=rules,
-        )
-    except IndeedScraperError as error:
-        console.print(f"[red]{error}[/red]")
-        raise typer.Exit(code=1) from error
-
-    if not results:
-        console.print("[yellow]Nothing to apply to.[/yellow]")
-        return
-    out = write_apply_results(results, config.state_dir / "applications" / "applications.csv")
-    table = Table(title="Applications")
-    table.add_column("Job ID", style="cyan")
-    table.add_column("Title")
-    table.add_column("Company")
-    table.add_column("Status")
-    table.add_column("Detail")
-    for result in results:
-        table.add_row(result.app_id, result.title[:40], result.company[:24], result.status, result.detail[:28])
-    console.print(table)
-    console.print(f"[green]results written to {out}[/green]")
-    console.print(f"[dim]ledger: {ledger_path(config)}[/dim]")
-
-
-@app.command("resume")
-def resume(
-    app_id: str = typer.Argument(..., help="Application id (the 12-char job id)."),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Refill but do not submit."),
-    autonomy: str = typer.Option(
-        None, "--autonomy", help="manual | auto | full. Overrides the policy file for this run."
-    ),
-) -> None:
-    """Resume an interrupted application from its persisted draft."""
-    from .apply.exceptions import ProfileNotFoundError
-    from .apply.flow import resume_application
-    from .apply.profile import load_profile
-
-    try:
-        profile = load_profile()
-    except ProfileNotFoundError as error:
-        console.print(f"[red]{error}[/red]")
-        raise typer.Exit(code=1) from error
-
-    config = _config()
-    store = CookieStore(config)
-    rules = _policy(autonomy, None, None)
-    console.print(f"[dim]autonomy: {rules.describe()}[/dim]")
-    try:
-        result = resume_application(
-            config,
-            store,
-            console,
-            app_id,
-            profile=profile,
-            confirm=True,
-            dry_run=dry_run,
-            policy=rules,
-        )
-    except IndeedScraperError as error:
-        console.print(f"[red]{error}[/red]")
-        raise typer.Exit(code=1) from error
-    if result is None:
-        raise typer.Exit(code=1)
-    console.print(f"[green]{app_id}: {result.status}[/green]")
-
-
-@app.command("check-responses")
-def check_responses() -> None:
-    """Refresh the response status of every submitted application.
-
-    Reads the application ledger and records the current status for each
-    submission. No polling, no scheduler: this is a manual command.
-    """
-    from .apply.workspace import ledger_path, responses_dir
-    from .response_monitor.indeed import collect_responses
-
-    config = _config()
-    records = collect_responses(ledger_path(config), responses_dir(config))
-    if not records:
-        console.print("[yellow]No submitted applications to check.[/yellow]")
-        return
-    table = Table(title="Application responses")
-    table.add_column("Job ID", style="cyan")
-    table.add_column("Title")
-    table.add_column("Status")
-    table.add_column("Checked")
-    for record in records:
-        table.add_row(
-            str(record.get("app_id", "")),
-            str(record.get("title", ""))[:40],
-            str(record.get("status", "")),
-            str(record.get("checked_at", ""))[:19],
-        )
-    console.print(table)
-
-
-def _policy(autonomy: str | None, max_per_day: int | None, min_delay: float | None):
-    """Resolve the autonomy policy: the policy file, with optional overrides."""
-    from .apply.autonomy import LEVELS, AutonomyPolicy
-
-    try:
-        rules = AutonomyPolicy.load()
-    except IndeedScraperError as error:
-        console.print(f"[red]{error}[/red]")
-        raise typer.Exit(code=1) from error
-    level = rules.level
-    if autonomy:
-        level = autonomy.strip().lower()
-        if level not in LEVELS:
-            console.print(f"[red]--autonomy must be one of {', '.join(LEVELS)}[/red]")
-            raise typer.Exit(code=1)
-    # The policy FILE is the operator's standing decision, so it is the
-    # ceiling: the override can lower the autonomy for one run but never
-    # raise it above what the file allows.
-    requested = level  # type: ignore[assignment]
-    if requested != rules.level:
-        capped = rules.restrict_to(requested)
-        if capped.level != requested:
-            console.print(
-                f"[yellow]--autonomy {requested} is above the policy file "
-                f"({rules.level}); using {capped.level}.[/yellow]"
-            )
-        rules = capped
-    rules = AutonomyPolicy(
-        level=rules.level,
-        max_applications_per_day=rules.max_applications_per_day if max_per_day is None else max_per_day,
-        min_delay_minutes=rules.min_delay_minutes if min_delay is None else min_delay,
-        allow_binding_commitments=rules.allow_binding_commitments,
-    )
-    return rules
+    return resolve_policy(console, autonomy, max_per_day, min_delay, policy_path)
 
 
 def _mirror_tracker_statuses(ledger, entries, state_dir) -> int:
@@ -555,75 +382,55 @@ def _tracker_row_matches(record: dict, entry) -> bool:
     )
 
 
-profile_app = typer.Typer(help="Inspect and fix the operator profile.")
-app.add_typer(profile_app, name="profile")
+resume_app = typer.Typer(help="Convert a resume between formats.")
+app.add_typer(resume_app, name="resume-doc")
 
 
-@profile_app.command("init")
-def profile_init(force: bool = typer.Option(False, "--force", help="Overwrite an existing profile.")) -> None:
-    """Write a profile template with the right permissions."""
-    from .apply.profile import PROFILE_PATH, profile_template, save_profile
-
-    if PROFILE_PATH.exists() and not force:
-        console.print(f"[yellow]{PROFILE_PATH} already exists - use --force to overwrite.[/yellow]")
-        raise typer.Exit(code=1)
-    path = save_profile(profile_template(), PROFILE_PATH)
-    console.print(f"[green]wrote {path} (0600)[/green]")
-    console.print(
-        "[yellow]Next: put your resume PDF at the resume_path in that file, then run "
-        "'profile set-resume <path>'.[/yellow]"
-    )
-
-
-@profile_app.command("show")
-def profile_show() -> None:
-    """Show the current profile and whether the resume is usable."""
-    import json
-
-    from .apply.profile import PROFILE_PATH, validate_resume
-
-    if not PROFILE_PATH.exists():
-        console.print(f"[yellow]No profile at {PROFILE_PATH} - run 'profile init'.[/yellow]")
-        raise typer.Exit(code=1)
-    data = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
-    table = Table(title=f"Profile {PROFILE_PATH}")
-    table.add_column("Field")
-    table.add_column("Value")
-    for key, value in data.items():
-        table.add_row(key, str(value)[:60])
-    console.print(table)
-    try:
-        validate_resume(Path(str(data.get("resume_path", ""))).expanduser())
-        console.print("[green]resume: ready[/green]")
-    except Exception as error:  # noqa: BLE001 - reported, not raised
-        console.print(f"[red]resume: {error}[/red]")
-
-
-@profile_app.command("set-resume")
-def profile_set_resume(
-    resume: Path = typer.Argument(  # noqa: B008 - typer's required argument pattern
-        ..., help="Path to your resume PDF."
+@resume_app.command("convert")
+def resume_doc_convert(
+    source: Path = typer.Argument(  # noqa: B008 - typer's argument pattern
+        ..., help="The resume file to read."
+    ),
+    target: Path = typer.Argument(  # noqa: B008 - typer's argument pattern
+        ..., help="The file to write; its extension picks the format."
     ),
 ) -> None:
-    """Point the profile at your resume PDF (validated before it is saved)."""
-    import json
+    """Convert a resume between DOCX, Markdown, text, JSON, YAML and TOML."""
+    from .resume import ResumeError, convert_file
 
-    from .apply.profile import PROFILE_PATH, validate_resume
-
-    if not PROFILE_PATH.exists():
-        console.print(f"[yellow]No profile at {PROFILE_PATH} - run 'profile init' first.[/yellow]")
-        raise typer.Exit(code=1)
     try:
-        validate_resume(resume.expanduser())
-    except Exception as error:
+        written = convert_file(source, target)
+    except ResumeError as error:
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(code=1) from error
-    data = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
-    data["resume_path"] = str(resume.expanduser())
-    path = PROFILE_PATH
-    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-    path.chmod(0o600)
-    console.print(f"[green]resume_path set to {data['resume_path']}[/green]")
+    console.print(f"[green]wrote {written}[/green]")
+
+
+@resume_app.command("formats")
+def resume_doc_formats() -> None:
+    """Show the resume formats this tool can read and write."""
+    from .resume import DEFAULT_EXTENSIONS
+
+    table = Table(title="Resume formats")
+    table.add_column("Format")
+    table.add_column("Extension")
+    for name, extension in DEFAULT_EXTENSIONS.items():
+        table.add_row(str(name), extension)
+    console.print(table)
+
+
+def _register_apply_commands() -> None:
+    """Wire the apply-side commands onto the Typer app.
+
+    Their bodies live in :mod:`indeed_scraper.commands.apply_cmds` so this
+    module stays a thin wiring layer.
+    """
+    from .commands.apply_cmds import register
+
+    register(app, console, _config)
+
+
+_register_apply_commands()
 
 
 @app.command()

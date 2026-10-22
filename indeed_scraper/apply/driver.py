@@ -29,6 +29,7 @@ from typing import Any
 
 from ..config import Config
 from ..cookies import CookieSession
+from ..errors import IndeedScraperError
 
 HARNESS_CDP_ENV = "INDEED_HARNESS_CDP"
 DEFAULT_HARNESS_CDP = "http://127.0.0.1:9222"
@@ -74,6 +75,33 @@ def _harness_driver(
         yield context, info
 
 
+def _attach_harness(
+    endpoint: str, session: CookieSession
+) -> tuple[tuple[Any, DriverInfo, Any] | None, Exception | None]:
+    """Attach to the harness browser, or report why it could not be reached.
+
+    The connection is made EAGERLY, outside the generator's body, so that a
+    failure to attach is reported as an attach failure and never as a failure
+    of the caller's code. The harness browser is a shared resource: it is only
+    disconnected, never closed.
+
+    Returns ``((context, info, manager), None)`` on success and
+    ``(None, cause)`` when the endpoint could not be reached.
+    """
+    from playwright.sync_api import Error
+
+    manager = _harness_driver(endpoint, session)
+    try:
+        context, info = manager.__enter__()
+    except Error as error:
+        manager.__exit__(None, None, None)
+        return None, error
+    except BaseException:
+        manager.__exit__(None, None, None)
+        raise
+    return (context, info, manager), None
+
+
 @contextmanager
 def open_driver(
     config: Config,
@@ -83,24 +111,47 @@ def open_driver(
 ) -> Iterator[tuple[Any, DriverInfo]]:
     """Yield ``(context, info)`` for the apply flow to drive.
 
-    Prefers the browser-harness browser when ``INDEED_HARNESS_CDP`` is set and
-    the endpoint answers; otherwise falls back to the repository's own
-    persistent profile.
+    Prefers the browser-harness browser when ``INDEED_HARNESS_CDP`` is set.
+
+    Two rules matter here:
+
+    * **Only the CONNECTION attempt may be caught.** ``contextlib`` implements
+      a with-block by calling ``gen.throw(exc)``, so a ``yield`` placed
+      INSIDE the ``try`` would route the CALLER's exception into the
+      driver's ``except Error`` - the flow's own Playwright error would be
+      swallowed and replaced, and the driver would fall back to the shared
+      profile as a side effect. The harness is therefore attached EAGERLY,
+      before the ``yield``.
+    * **A configured harness endpoint that cannot be reached is an error,
+      not a fallback.** The repository's ``data/chrome-profile`` browser is
+      a differently-fingerprinted browser that carries the cf_clearance
+      cookie; opening it because the harness crashed would be a surprise,
+      and it is exactly the HC-7 risk of touching a shared profile. The
+      operator gets a clear error and can decide what to do.
     """
     from playwright.sync_api import Error
 
     endpoint = harness_endpoint()
     if endpoint:
+        attached, cause = _attach_harness(endpoint, session)
+        if attached is None:
+            raise IndeedScraperError(
+                f"Could not attach to browser harness at {endpoint}"
+                f"{f': {cause}' if cause else ''}. "
+                f"Start the harness browser, or unset {HARNESS_CDP_ENV} to "
+                "use the local profile driver."
+            ) from cause
+        context, info, manager = attached
         try:
-            with _harness_driver(endpoint, session) as opened:
-                yield opened
-            return
-        except Error:
-            # The harness endpoint is unreachable: fall back to the local profile.
-            pass
+            # The yield is OUTSIDE every try/except that catches a
+            # Playwright Error, so an error raised by the flow reaches the
+            # caller unchanged.
+            yield context, info
+        finally:
+            manager.__exit__(None, None, None)
+        return
 
     from ..browser import open_context
-    from ..errors import IndeedScraperError
 
     try:
         context_manager = open_context(config, session=session, headless=headless)

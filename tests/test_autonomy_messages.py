@@ -56,6 +56,7 @@ def test_policy_is_read_from_the_file(tmp_path: Path) -> None:
                 "max_applications_per_day": 40,
                 "min_delay_minutes": 5,
                 "allow_binding_commitments": True,
+                "unattended_submit": True,
             }
         ),
         encoding="utf-8",
@@ -67,6 +68,21 @@ def test_policy_is_read_from_the_file(tmp_path: Path) -> None:
     assert policy.allows_binding_commitment is True
     assert policy.max_applications_per_day == 40
     assert policy.min_delay_minutes == 5
+
+
+def test_a_level_alone_does_not_allow_an_unattended_submit(tmp_path: Path) -> None:
+    """The level is a permission; the switch is the decision.
+
+    This is the defect C2 fixed: a policy file that said ``"level": "full"``
+    used to be enough to send real applications with no prompt, even though
+    HC-4 says no unattended submit.
+    """
+    path = tmp_path / "policy.json"
+    path.write_text(json.dumps({"level": "full"}), encoding="utf-8")
+    policy = AutonomyPolicy.load(path)
+    assert policy.level == "full"
+    assert policy.unattended_submit is False
+    assert policy.allows_submit is False
 
 
 def test_an_unknown_level_is_rejected(tmp_path: Path) -> None:
@@ -81,8 +97,13 @@ def test_the_level_decides_what_is_allowed(tmp_path: Path) -> None:
     auto = AutonomyPolicy(level="auto")
     full = AutonomyPolicy(level="full")
     assert manual.allows_submit is False and manual.allows_reply is False
-    assert auto.allows_submit is True and auto.allows_reply is False
-    assert full.allows_submit is True and full.allows_reply is True
+    assert auto.allows_submit is False and auto.allows_reply is False
+    assert full.allows_submit is False and full.allows_reply is True
+    # The switch is what turns the permission into a decision.
+    assert AutonomyPolicy(level="auto", unattended_submit=True).allows_submit is True
+    assert AutonomyPolicy(level="full", unattended_submit=True).allows_submit is True
+    # "manual" is a hard stop: even with the switch, the operator is asked.
+    assert AutonomyPolicy(level="manual", unattended_submit=True).allows_submit is False
 
 
 def test_saved_policy_is_private_and_round_trips(tmp_path: Path) -> None:

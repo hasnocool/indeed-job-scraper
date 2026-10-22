@@ -55,6 +55,104 @@ HC-8 secrets 0600, outside git.
 | T7 | integration + verification SC1–SC8 | lead + worker-verify | all criteria PASS with artifacts |
 | T8 | independent diff review | worker-review | unconditional approval |
 
+## TODOs
+
+Legend: `[x]` = implemented and independently verified with a captured artifact.
+`[ ]` = outstanding. Every artifact path below is relative to
+`.omo/start-work/evidence/`; every run has a matching `ledger.jsonl` entry.
+
+### Wave 0 — state restoration (lead, done)
+- [x] T0.1 Restore `.omo/boulder.json` and the evidence ledger lost to the chat disconnect
+- [x] T0.2 Re-confirm the inherited baseline: 219 tests green, 98 master jobs, HEAD `b6140ab`
+
+### Wave 1 — verification lanes (four independent workers, parallel, disjoint evidence dirs)
+> T1–T6 are **implemented and committed** (through `b6140ab`), but the prior
+> session's evidence ledger was destroyed by the chat disconnect. They stay
+> `[ ]` until V5 independently re-confirms each acceptance claim in this
+> session — an inherited done-claim is not a verified one.
+
+- [ ] T1 `apply/{types,exceptions,profile,ledger,risk,drafts}.py` + `tests/test_apply_core.py` — atomic idempotent reserve; profile 0600 round-trip → `v1-offline/`
+- [ ] T2 `apply/indeed_form.py` + `tests/test_indeed_form.py` — portal detection, field fill, `FieldMissingError` → `v1-offline/`
+- [ ] T3 `response_monitor/{__init__,indeed,store}.py` + `tests/test_response_monitor.py` — reads ledger, writes `data/responses/<app_id>.json` → `v1-offline/`
+- [ ] T4 `apply/driver.py` — attaches over CDP or launches the warmed profile; seeds cookies; raises on challenge → `v1-offline/`
+- [ ] T5 `apply/flow.py` — reserve → confirm → fill → submit → mark; budget; drafts; resume → `v1-offline/`
+- [ ] T6 `cli.py` wiring `apply` / `resume` / `check-responses` / `profile` → `v1-offline/`
+- [ ] T7.1 V1 offline acceptance: SC1-offline, SC3, SC4, SC5, SC6, SC7 with artifacts → `v1-offline/`
+- [ ] T7.2 V2 live browser dry-run against a real Indeed posting: SC1-live, SC2 (PNG + log + ledger + draft) → `v2-live/`
+- [ ] T7.3 V3 adversarial QA: every applicable ultraqa class probed with a captured observable → `v3-adversarial/`
+- [ ] T8 V4 independent diff review vs `72f4fd2` against HC-1..HC-8 and OQ1..OQ7 (SC8) → `v4-review/`
+
+### Wave 2 — independent verification of every done-claim
+- [ ] V5 `AdversarialVerify` of the T1–T6 acceptance claims and the V1–V4 lane claims; only `confirmed` unblocks → `v5-verify/`
+
+### Wave 3 — defect repair (runs only if V4 or V5 confirms a defect)
+- [ ] F1 Fix every confirmed defect; each fix re-verified independently → `f1-fixes/`
+
+#### F1 wave restart (the owning session died; the lanes are re-dispatched)
+The codex session that dispatched the F1 wave lost its transport and died
+mid-flight. All three lanes were left red with **no production change**, and
+nobody was retrying them. The five failing-first test files were RETAINED as
+the red baseline rather than deleted, so the restart is verifiable against the
+same contract. Measured red baseline: lane C **31 failed / 21 passed**,
+lane A **16 failed**.
+
+The shared contract `SubmitResult(clicked, confirmed, detail)` lives in
+`indeed_scraper/apply/types.py` — a file in no lane's write scope — so lanes A
+and B cannot disagree about it. `ApplyStatus` was widened to the statuses the
+code actually writes.
+
+- [x] F1-A `apply/{indeed_form,selectors,risk,drafts,worker}.py` → `tests/test_fix_lane_a_submit_truth.py` green (17 tests)
+- [x] F1-B `apply/{flow,driver,ledger,tracker}.py` + `response_monitor/*` + `cookies.py` → new `tests/test_fix_lane_b_*.py` green
+- [x] F1-C `cli.py` + `messages/*` + `apply/autonomy.py` + new `commands/` → the four `tests/test_fix_lane_c_*.py` green
+- [ ] F1-D `scraper.py` + `organize/*` + new `scripts/capture_search_page.py` + new `tests/test_extraction_completeness.py` → the extraction drift gate green
+  - **PARTIAL — the defect is still OPEN.** The live capture was BLOCKED: Indeed
+    refused the saved session (auth wall / challenge), so there is no real DOM
+    and a CSS-selector fix would be a guess. The lane correctly refused to
+    write one. Delivered: the read-only capture tool, the per-field fill-rate
+    summary in the `organize` output, and the drift gate itself.
+  - The gate is marked `xfail(strict=True)`, NOT skipped: the suite stays a
+    usable gate, the defect stays explicitly recorded, and the marker fails
+    LOUDLY the moment the extractor is fixed (a strict xfail that unexpectedly
+    passes is a suite error).
+  - **Remediation:** re-authenticate the session, capture the live search page
+    into `tests/fixtures/indeed_search_page.html`, fix `_EXTRACT_JS` against it,
+    replace the reconstructed fixture, remove the xfail marker.
+    Measured today: `snippet` empty in 98/98 records, `posted` empty in 40/98,
+    and the exported master CSV has an empty `Job Description` column in 98/98
+    rows.
+
+**F1-D is not part of the original triage.** An independent measurement found
+the extractor leaves `snippet` **empty in 98/98 master records (100%, every
+run)** and `posted` empty in 40/98, with no completeness check anywhere in the
+package and no test asserting the field at all — the whole suite is green
+while the operator's exported CSV has an empty `Job Description` column in
+98/98 rows. No lane's defect list covers it. Its scope is disjoint from A/B/C.
+
+**Ledger status sets agreed across lanes** (A writes them, B enforces them):
+`LIVE_STATUSES = {reserved, submitting, submitted, unconfirmed}`; the apply-path
+skip set and the resume-path refusal set are aligned on
+`{submitted, submitting, unconfirmed}`, so the resume path can no longer
+re-submit a posting left in `submitting` (B1). A click with no confirmation
+lands in `unconfirmed` — never retried automatically, surfaced to the operator,
+because a duplicate application is worse than a missed one.
+
+> Host note: the suite must be run as `PYTHONPATH=$PWD python3 -m pytest -q`.
+> The `rtk` wrapper strips the CWD from `sys.path`, so a bare `pytest` fails
+> with `ModuleNotFoundError`. That is a host artefact, not a project defect —
+> do not "fix" it with a conftest.py or pyproject.toml.
+
+### Final Verification Wave
+- [x] F2.1 Full suite green. Two collection scopes, both verified:
+  - repo-wide (`PYTHONPATH=$PWD python3 -m pytest -q`) → **440 collected, 439 passed, 1 xfailed, 0 failed** (409 from `tests/` + 31 from `api/tests/`; baseline was 219).
+  - scraper only (`python3 -m pytest tests/ -q`) → **409 collected, 408 passed, 1 xfailed, 0 failed**.
+  - api backend (`cd api && python3 -m pytest tests/ -q`) → **31 passed, 0 failed**.
+  The 1 xfail is the deliberate F1-D open-defect marker. Proven self-contained: the suite was re-run green after deleting its generated `/tmp` fixture.
+- [x] F2.2 `organize` still yields 98 master jobs → 5 runs, 98 unique, 7 duplicates, 26 new / 6 updated / 66 unchanged (identical to baseline). The new **Field Completeness** table shows `snippet 0% (0/98)`, so the open drift is visible in the operator's own output.
+- [x] F2.3 `doctor` reports every check ok → python, playwright, chromium, saved session, state dir, indeed reachable (HTTP 200)
+- [x] F2.4 Secrets: no profile/ledger/draft/response file is tracked or staged; every secret path is gitignored; the cookie files are now 0600 in a 0700 directory (they were 0644)
+- [x] F2.5 No leftover QA assets: every spawned browser, sandbox and temp dir torn down; the suite's own fixtures are regenerated on demand
+- [x] F2.6 Every final-verification checkbox is `[x]` and every ledger entry has an artifact. **F1-D remains deliberately open** - see its entry above; it is an operator-action blocker (a live capture needs a re-authenticated session), not an unfinished implementation.
+
 ## Success criteria
 - **SC1 happy** `python3 -m indeed_scraper apply --dry-run --limit 3` → exit 0; ledger 3×`reserved`, 0×`submitted`; 3 `draft.json`.
 - **SC2 real browser** live dry-run reaches a real Indeed posting signed-in; PNG + log.

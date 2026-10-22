@@ -133,7 +133,46 @@ The special ``.indeed-state/`` directory is no longer used; state root defaults 
     +-- scraper.py    multi-location search, extraction, dedupe
     +-- export.py     JSON/CSV writers
     +-- errors.py     typed failures
+    api/              FastAPI backend serving the scraper's data read-only
+    frontend/         Vue 3 + Vite frontend for the backend
+    docs/             shared API contract for api/ and frontend/
     tests/            cookie store, export and search-scope tests
+
+## Web app (api/ + frontend/)
+
+Two sub-projects sit on top of the scraper: a **read-only API** over the files
+the scraper already writes, and a **Vue frontend** that renders them. The
+scraper itself stays the only thing that writes to `data/`.
+
+    docs/api-contract.md      the frozen contract both sides implement
+
+### api/ — FastAPI backend
+
+    cd api
+    uv sync
+    uv run uvicorn app.main:app --reload --port 8001
+
+Serves JSON under `http://127.0.0.1:8001/api` (`/api/docs` for Swagger UI):
+`/api/health`, `/api/jobs`, `/api/jobs/{short_id}`, `/api/jobs/facets`,
+`/api/session`, `/api/runs`, `/api/applications`, `/api/applications/summary`
+and `/api/messages`.
+
+The API **never** exposes cookie values — `/api/session` returns session
+metadata only, because the cookie list is a live Indeed credential.
+
+### frontend/ — Vue 3 frontend
+
+    cd frontend
+    pnpm install
+    pnpm dev          # http://127.0.0.1:5173, proxies /api to :8001
+
+Four routes: the job list (`/`), a job's details (`/jobs/:short_id`), session
+health and scrape history (`/session`), and the application ledger with sent
+messages (`/applications`).
+
+Run the backend first — the frontend proxies `/api` to
+`http://127.0.0.1:8001`. Set `VITE_API_PROXY_TARGET` to point elsewhere.
+
 
 ## Notes
 
@@ -190,6 +229,35 @@ python3 -m indeed_scraper organize
 #
 # If data/runs/ is empty, a friendly message is printed and no files are written.
 ```
+
+> **Known issue - the job description is not being captured.** The card
+> extractor reads the description with a CSS selector that no longer matches
+> Indeed's current markup, so `snippet` is empty in **98 of 98** records of
+> `data/master/jobs_master.json` (every run), `posted` is empty in 40 of 98, and
+> the exported `jobs_master.csv` has an empty **Job Description** column in
+> 98 of 98 rows. Nothing warns about it, because the extractor tests use
+> hand-written DOM with no description element in the fixture.
+>
+> The fix needs a real capture of the current Indeed DOM - the selector cannot
+> be rewritten blind - and a live capture was refused by Indeed, so the defect
+> is still open. `tests/test_extraction_completeness.py` is the drift gate and
+> is marked `xfail(strict=True)` until it is fixed; the `organize` summary now
+> prints a per-field fill rate, so the drift is visible without reading a test.
+
+> **Known issue - the job description is not being captured.** The card
+> extractor reads the description with a CSS selector that no longer matches
+> Indeed's current markup, so `snippet` is empty in **98 of 98** records of
+> `data/master/jobs_master.json` (every run), `posted` is empty in 40 of 98, and
+> the exported `jobs_master.csv` has an empty **Job Description** column in
+> 98 of 98 rows. Nothing warns about it, because the extractor tests use
+> hand-written DOM with no description element in the fixture.
+>
+> The fix needs a real capture of the current Indeed DOM - the selector cannot
+> be rewritten blind - and a live capture was refused by Indeed, so the defect
+> is still open. `tests/test_extraction_completeness.py` is the drift gate and
+> is marked `xfail(strict=True)` until it is fixed; the `organize` summary now
+> prints a per-field fill rate, so the drift is visible without reading a test.
+
 ## Applying to jobs
 
 The `apply` command fills Indeed-hosted application forms from a profile you
@@ -223,19 +291,41 @@ raises a `FieldMissingError` naming the question instead.
 
 - **Idempotent:** every application is reserved in `data/applications/ledger.jsonl`
   *before* the browser is touched, keyed by the same SHA-256 fingerprint the
-  master dataset uses. A posting is never applied to twice.
-- **No unattended submits:** submission requires an explicit confirmation, and
-  `--dry-run` never submits at all.
+  master dataset uses. A posting is never applied to twice. The apply path and
+  the resume path share one guard, so a posting left in `submitting` by a killed
+  run is never re-submitted by a `resume`.
+- **A submission is only recorded when it is CONFIRMED:** the submit control is
+  clicked at most once, and a positive signal - a confirmation in the page, the
+  title, or a post-submit URL - must be observed before the ledger says
+  `submitted`. A click with no signal is recorded as `unconfirmed`: it may have
+  reached the employer, so it is never retried automatically and never counted
+  as a success.
+- **No unattended submits by default:** an unattended submission needs the
+  policy's `unattended_submit` switch, and `--dry-run` never submits at all.
 - **No fabricated answers:** a required field with no value in the profile stops
-  the flow and names the question.
+  the flow and names the question. A form with no applicant inputs at all is a
+  refusal, not a quiet success.
 - **The shared session is protected:** a challenge (CAPTCHA / Cloudflare /
   sign-in wall) stops the run instead of being retried, so the working scrape
   session is never poisoned.
 - **Resumable:** each attempt writes `data/applications/drafts/<job-id>/draft.json`
-  so an interrupted fill can be picked up with `resume`.
+  so an interrupted fill can be picked up with `resume`. The draft is a receipt:
+  it lists only the fields that actually reached the form.
 - **Rate limited:** `RiskBudget` caps applications per day (2 by default) and
-  enforces a minimum delay between submissions. Tune with
-  `INDEED_MAX_APPS_PER_DAY` and `INDEED_MIN_DELAY_MINUTES`.
+  enforces a minimum delay between submissions. An `unconfirmed` attempt counts
+  against the cap, because a click that may have gone out cannot be un-sent.
+  Tune with `INDEED_MAX_APPS_PER_DAY` and `INDEED_MIN_DELAY_MINUTES`.
+
+### Exit codes
+
+`apply` reports its outcome in the exit code, so an automated caller can tell
+success from total failure:
+
+| Code | Meaning |
+| --- | --- |
+| `0` | something was submitted, or the dry run did exactly what it was asked to do, or there was nothing to do |
+| `2` | nothing was submitted and at least one attempt failed |
+| `3` | the run was blocked by a challenge (CAPTCHA / auth wall) |
 
 ### Browser driver
 
@@ -252,27 +342,41 @@ Whether the agent acts on its own is an explicit, operator-owned setting in
 
 ```json
 {
-  "level": "full",
-  "max_applications_per_day": 25,
-  "min_delay_minutes": 15,
+  "level": "manual",
+  "unattended_submit": false,
+  "max_applications_per_day": 2,
+  "min_delay_minutes": 30,
   "allow_binding_commitments": false
 }
 ```
 
-| Level | Submissions | Replies |
-| --- | --- | --- |
-| ``manual`` | asked every time | drafted only |
-| ``auto`` | sent unattended (inside the budget) | drafted only |
-| ``full`` | sent unattended (inside the budget) | sent unattended |
+| Level | Permission | Submissions | Replies |
+| --- | --- | --- | --- |
+| `manual` | none | asked every time | drafted only |
+| `auto` | may submit unattended | sent unattended **only if** `unattended_submit` is true | drafted only |
+| `full` | may submit unattended | sent unattended **only if** `unattended_submit` is true | sent unattended |
 
-``--autonomy manual|auto|full`` overrides the file for one run. The daily cap
-and the delay are enforced by the flow, so a policy cannot be used to exceed
-them.
+**The level is a permission, not a decision.** An unattended submission also
+requires the separate `unattended_submit` switch, which is OFF unless the
+operator writes it into the policy file. This matters because the level alone
+used to be enough: with a policy file saying `"level": "full"` the operator's
+real applications went out with no prompt at all.
+
+`--autonomy manual|auto|full` can only **lower** the ceiling for one run; it
+can never raise it above what the file allows. `--max-per-day` can only lower
+the daily cap and `--min-delay` can only raise the delay, for the same reason.
+
+### Replies fail closed
+
+A recruiter message is classified as `offer`, `interview`, `question`,
+`general` or `unknown`. Only a message matching a known **safe** shape is
+`general`; anything unrecognised is `unknown`, and `unknown` is *not* "safe to
+send alone" - it is drafted for the operator.
 
 One thing stays gated in every level: a reply that **accepts an offer** or
 agrees to contractual terms. That is a binding commitment made on the
 operator's behalf, and it is only sent unattended when
-``allow_binding_commitments`` is true.
+`allow_binding_commitments` is true.
 
 ## The operator profile
 
@@ -294,6 +398,49 @@ The resume is **validated before anything is applied**: it must exist, be a
 PDF, and be a real document (at least 1 KB). A placeholder is refused with an
 explicit message, because a stub would be uploaded to an employer.
 
+## Resume formats
+
+A resume is one document in many shapes. The `resume-doc` command converts
+between them, so a resume you keep in Markdown can be sent as a Word
+document, checked as JSON, or fed to another tool as TOML.
+
+| Format | Extension | Notes |
+| --- | --- | --- |
+| Word | `.docx` | Reads and writes the styled document. |
+| Markdown | `.md` | Headings for the sections, bullets for the items. |
+| Plain text | `.txt` | The same content with no decoration. |
+| JSON | `.json` | The full tree, one object per line-group. |
+| YAML | `.yaml` / `.yml` | The same tree as JSON. |
+| TOML | `.toml` | The same tree, with the sections as tables. |
+
+```bash
+# see what is supported
+python3 -m indeed_scraper resume-doc formats
+
+# convert a Word resume to YAML
+python3 -m indeed_scraper resume-doc convert ~/Documents/resume.docx resume.yaml
+
+# and back again - any format converts to any other
+python3 -m indeed_scraper resume-doc convert resume.yaml resume.docx
+```
+
+The target's extension picks the format. Every format parses into one
+canonical model and renders back out of it, so **a resume survives the round
+trip through any format unchanged** - the same name, contact, summary,
+skills, jobs with their periods and bullets, education and closing note come
+back out. That guarantee is what the test suite pins, using both of the real
+resume documents as fixtures.
+
+As a library:
+
+```python
+from pathlib import Path
+from indeed_scraper.resume import convert_file, parse_file
+
+resume = parse_file(Path("resume.docx"))              # read into the model
+convert_file(Path("resume.docx"), Path("resume.toml"))  # or convert in one step
+```
+
 ## Replying to recruiters
 
 Indeed's candidate inbox is a separate web app (``messages.indeed.com``)
@@ -308,13 +455,14 @@ python3 -m indeed_scraper messages --limit 5
 ```
 
 Each incoming message is classified (``offer``, ``interview``, ``question``,
-``general``) and answered from the operator profile: interview replies quote
-the stated availability, and a question the profile can answer is answered
-from ``screening_answers``. A question it cannot answer is drafted for the
-operator instead of being guessed. Every decision - sent or drafted - is
-appended to ``data/messages/sent.jsonl``, so an unattended reply can be
-audited afterwards, and a conversation that already received a reply is never
-answered twice.
+``general``, ``unknown``) and answered from the operator profile: interview
+replies quote the stated availability, and a question the profile can answer is
+answered from ``screening_answers``. A question it cannot answer is drafted for
+the operator instead of being guessed. A message that matches no known shape is
+``unknown``, and an unknown message is **drafted, never sent alone** - the
+classifier fails closed. Every decision - sent or drafted - is appended to
+``data/messages/sent.jsonl``, so an unattended reply can be audited afterwards,
+and a conversation that already received a reply is never answered twice.
 
 ## Syncing with Indeed's application tracker
 

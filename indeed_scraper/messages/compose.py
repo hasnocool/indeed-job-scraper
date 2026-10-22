@@ -5,10 +5,15 @@ builds a reply from the operator's profile. There is no language model in the
 loop, so the wording is predictable and the operator can see exactly what
 will be sent before it is sent.
 
-One class of reply is never sent unattended unless the policy explicitly
-allows it: a reply that accepts an offer or agrees to contractual terms
-(``offer_received``). That is a binding commitment made on the operator's
-behalf, and the surface it arrives on is a recruiter's message.
+The default is "a human looks at it". A reply only goes out alone when the
+message is one of the narrow, clearly-safe categories - an interview request
+or an ordinary note about a role. Everything else, including a message the
+classifier does not recognise, is held for the operator. The direction matters:
+a false positive only holds a reply for a minute, while a false negative
+accepts the operator's job for them.
+
+The pattern vocabulary lives in :mod:`indeed_scraper.messages.patterns` so it
+can be audited on its own.
 """
 
 from __future__ import annotations
@@ -18,57 +23,34 @@ from dataclasses import dataclass
 from typing import Literal
 
 from ..apply.profile import Profile
+from .patterns import (
+    BINDING_PATTERNS,
+    COMPILED_BINDING,
+    COMPILED_INTERVIEW,
+    COMPILED_OFFER,
+    COMPILED_QUESTION,
+    COMPILED_SAFE,
+    INTERVIEW_PATTERNS,
+    OFFER_PATTERNS,
+    QUESTION_PATTERNS,
+    SAFE_PATTERNS,
+)
 
 MessageKind = Literal["offer", "interview", "question", "general", "unknown"]
 
-#: Phrases that indicate an offer or another binding commitment.
-OFFER_PATTERNS = (
-    r"\boffer(?:s|ed|ing)?\b",
-    r"\bhire(?:ing|d|s)?\b",
-    r"\baccept(?:ance)? (?:of|the|our|this|an|it)\b",
-    r"\baccept(?:ance)? of\b",
-    r"\bjoining us\b",
-    r"\bjoin (?:us|our team)\b",
-    r"\bplease (?:confirm|sign)\b",
-    r"\bformal (?:offer|appointment|contract)\b",
-    r"\bemployment agreement\b",
-    r"\bstart (?:date|your employment)\b",
-    r"\bstarting (?:on|from|january|february|march|april|may|june|july|august|september|october|november|december)\b",
-    r"\bsalary of\b",
-    r"\bcompensation (?:package|offer)\b",
-    r"\bcongratulations\b",
-)
-
-#: Phrases that indicate an interview or scheduling request.
-INTERVIEW_PATTERNS = (
-    r"\binterview\b",
-    r"\bmeet(?:ing)?\b",
-    r"\bcall\b",
-    r"\bschedule\b",
-    r"\bavailable\b",
-    r"\bavailability\b",
-    r"\bphone screen\b",
-    r"\bcoffee chat\b",
-    r"\bwhen are you (?:available|free)\b",
-)
-
-#: Phrases that indicate a question the operator must answer.
-QUESTION_PATTERNS = (
-    r"\?$",
-    r"\bcan you\b",
-    r"\bcould you\b",
-    r"\bwould you\b",
-    r"\bdo you\b",
-    r"\bplease (?:confirm|let us know|share|send)\b",
-    r"\bwhat is your\b",
-    r"\bhow much\b",
-)
-
-_COMPILED = {
-    "offer": [re.compile(p, re.IGNORECASE) for p in OFFER_PATTERNS],
-    "interview": [re.compile(p, re.IGNORECASE) for p in INTERVIEW_PATTERNS],
-    "question": [re.compile(p, re.IGNORECASE) for p in QUESTION_PATTERNS],
-}
+__all__ = [
+    "BINDING_PATTERNS",
+    "INTERVIEW_PATTERNS",
+    "OFFER_PATTERNS",
+    "QUESTION_PATTERNS",
+    "SAFE_PATTERNS",
+    "MessageKind",
+    "ReplyPlan",
+    "build_reply",
+    "classify",
+    "is_binding",
+    "redact_operator",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,40 +63,17 @@ class ReplyPlan:
     reason: str = ""
 
 
-#: A SECOND, independent detector for binding language. The offer patterns
-#: above classify a message; these say "this needs a human" whatever the
-#: message turned out to be about. A contract request that happens not to
-#: look like an offer still reaches the operator.
-BINDING_PATTERNS = (
-    r"\bcountersign\b",
-    r"\bemployment agreement\b",
-    r"\bcontract\b",
-    r"\bsign(?:ed|ature|ing)?\b",
-    r"\bsignature\b",
-    r"\boffer letter\b",
-    r"\bterms and conditions\b",
-    r"\baccept the terms\b",
-    r"\btax form\b",
-    r"\bnon[- ]?disclosure\b",
-    r"\bwork permit\b",
-    r"\bbanking details\b",
-    r"\bSIN\b",
-    r"\bstart date\b",
-    r"\bjoining date\b",
-)
-
-_COMPILED_BINDING = [re.compile(p, re.IGNORECASE) for p in BINDING_PATTERNS]
-
-
 def is_binding(text: str) -> bool:
     """True when the message contains binding or contractual language.
 
     This is deliberately independent of :func:`classify`: the classifier
-    decides what to SAY, this decides whether a HUMAN must look first.
+    decides what to SAY, this decides whether a HUMAN must look first. A
+    contract request that happens not to look like an offer still reaches the
+    operator.
     """
     if not text or not text.strip():
         return False
-    return any(pattern.search(text) for pattern in _COMPILED_BINDING)
+    return any(pattern.search(text) for pattern in COMPILED_BINDING)
 
 
 def redact_operator(body: str, profile: Profile) -> str:
@@ -145,16 +104,23 @@ def redact_operator(body: str, profile: Profile) -> str:
 
 
 def classify(text: str) -> MessageKind:
-    """Classify an incoming message."""
+    """Classify an incoming message.
+
+    The kinds are ordered by how much they matter: an offer outranks an
+    interview, which outranks a question. A message that matches none of the
+    known shapes is "unknown" - and "unknown" is NOT "safe to send alone".
+    """
     if not text.strip():
         return "unknown"
-    if any(pattern.search(text) for pattern in _COMPILED["offer"]):
+    if any(pattern.search(text) for pattern in COMPILED_OFFER):
         return "offer"
-    if any(pattern.search(text) for pattern in _COMPILED["interview"]):
+    if any(pattern.search(text) for pattern in COMPILED_INTERVIEW):
         return "interview"
-    if any(pattern.search(text) for pattern in _COMPILED["question"]):
+    if any(pattern.search(text) for pattern in COMPILED_QUESTION):
         return "question"
-    return "general"
+    if any(pattern.search(text) for pattern in COMPILED_SAFE):
+        return "general"
+    return "unknown"
 
 
 def _availability(profile: Profile) -> str:
@@ -164,14 +130,22 @@ def _availability(profile: Profile) -> str:
 
 
 def _answer_for(profile: Profile, question: str) -> str | None:
-    """Answer a question from the profile's screening answers, when we can."""
+    """Answer a question from the profile's screening answers, on a CONFIDENT match only.
+
+    A match is confident when the whole key appears as a whole-word phrase in
+    the question. A shared generic word (or one key inside another, such as
+    "java" inside "javascript") is deliberately NOT enough - an unconfident
+    match means "unanswerable", so the operator approves the reply.
+    """
     if not profile.screening_answers:
         return None
     lowered = question.lower()
     for key, answer in profile.screening_answers.items():
-        if key.lower() in lowered or any(
-            word in lowered for word in key.lower().split() if len(word) > 3
-        ):
+        phrase = key.strip().lower()
+        if not phrase:
+            continue
+        pattern = re.compile(r"\b" + re.escape(phrase) + r"\b")
+        if pattern.search(lowered):
             return answer
     return None
 
@@ -249,6 +223,19 @@ def build_reply(profile: Profile, incoming: str, company: str = "") -> ReplyPlan
             ),
             requires_approval=True,
             reason="the question is not answerable from the profile",
+        )
+
+    if kind == "unknown":
+        # Fail closed: an unrecognised recruiter message is never sent
+        # unattended - only the narrow, clearly-safe categories may go out alone.
+        return ReplyPlan(
+            kind=kind,
+            body=(
+                f"{salutation}\n\nThank you for your message about {role}. "
+                "I am interested and will get back to you with details shortly."
+            ),
+            requires_approval=True,
+            reason="the message was not recognised; it needs a person's review",
         )
 
     return ReplyPlan(

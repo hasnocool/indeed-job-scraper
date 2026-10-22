@@ -6,6 +6,12 @@ subpackage and its callers share one definition.
 
 from __future__ import annotations
 
-from indeed_scraper.apply.types import ApplyData, ApplyResult, ApplyStatus, PortalType
+from indeed_scraper.apply.types import (
+    ApplyData,
+    ApplyResult,
+    ApplyStatus,
+    PortalType,
+    SubmitResult,
+)
 
-__all__ = ["ApplyData", "ApplyResult", "ApplyStatus", "PortalType"]
+__all__ = ["ApplyData", "ApplyResult", "ApplyStatus", "PortalType", "SubmitResult"]

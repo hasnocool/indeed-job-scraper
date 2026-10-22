@@ -383,8 +383,13 @@ def test_fill_indeed_form_optional_cover_letter_omitted_when_empty() -> None:
 # submit_application tests
 # ---------------------------------------------------------------------------
 
-def test_submit_application_returns_false_when_no_submit() -> None:
-    """submit_application returns False when no submit control exists (no raise)."""
+def test_submit_application_reports_nothing_clicked_when_no_submit() -> None:
+    """submit_application reports a click of nothing when no submit control exists.
+
+    The result is an OBJECT now, not a bool: the contract has to say
+    "clicked" and "confirmed" separately, because a click with no
+    confirmation is an attempt, not a success and not a no-op.
+    """
     page = _make_page()
     # Ensure no submit button selectors are visible
     for sel in [
@@ -395,11 +400,12 @@ def test_submit_application_returns_false_when_no_submit() -> None:
     ]:
         page._locators[sel] = _FakeLocator(visible=False)
     result = submit_application(page)
-    assert result is False
+    assert result.clicked is False
+    assert result.confirmed is False
 
 
-def test_submit_application_returns_true_when_submit_exists_and_success() -> None:
-    """submit_application returns True when a submit control is found and clicked."""
+def test_submit_application_confirms_a_submitted_title() -> None:
+    """A confirmation in the page title is reported as a confirmed submit."""
     page = _make_page("https://ca.indeed.com/apply/in/test123")
     page.set_content(
         '<html><head><title>Application Submitted</title></head>'
@@ -408,10 +414,18 @@ def test_submit_application_returns_true_when_submit_exists_and_success() -> Non
         "</body></html>"
     )
     result = submit_application(page)
-    assert result is True
+    assert result.clicked is True
+    assert result.confirmed is True
 
-def test_submit_application_returns_true_when_submit_with_submit_text() -> None:
-    """submit_application returns True when submit button has 'Submit' text."""
+
+def test_submit_application_does_not_confirm_without_a_signal() -> None:
+    """A click with no success signal is NOT reported as confirmed.
+
+    The old code fell through to ``return True`` ("the click succeeded even
+    without an explicit signal"), so a submission that never happened was
+    recorded as one. "submitted" is a terminal ledger state, so the lie was
+    permanent.
+    """
     page = _make_page("https://ca.indeed.com/apply/in/test123")
     page.set_content(
         '<html><head><title>Done</title></head>'
@@ -420,4 +434,5 @@ def test_submit_application_returns_true_when_submit_with_submit_text() -> None:
         "</body></html>"
     )
     result = submit_application(page)
-    assert result is True
+    assert result.clicked is True
+    assert result.confirmed is False

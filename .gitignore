@@ -19,3 +19,31 @@ __pycache__/
 log_*.txt
 log_*.json
 job_data_extended.csv
+pytestdebug.log
+
+# personal documents: the operator's resume in every format, and the copies
+# the resume tests use. These carry a real name, phone number and employment
+# history, and this repository is mirrored to a public host - they must never
+# be committed. The converter itself (indeed_scraper/resume/) is committed;
+# only the documents are not.
+resume/
+tests/fixtures/*.docx
+# The resume round-trip test asserts the contact details of those personal
+# documents, so it names a real phone number and cannot be published either.
+# It stays in the working tree and runs locally, where the documents are.
+tests/test_resume_convert.py
+
+# api backend
+api/.venv/
+api/.pytest_cache/
+api/**/__pycache__/
+api/*.egg-info/
+api/dist/
+api/.ruff_cache/
+
+# frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.vue-tsc/
+frontend/coverage/

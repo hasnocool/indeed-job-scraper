@@ -87,7 +87,13 @@ def test_the_flow_prompts_when_the_policy_is_manual(tmp_path: Path) -> None:
 
 
 def test_the_flow_does_not_prompt_when_the_policy_allows_it(tmp_path: Path) -> None:
-    """auto/full: the flow submits without a prompt, inside the risk budget."""
+    """auto/full PLUS the switch: the flow submits without a prompt.
+
+    The level alone is only a permission. The unattended submit also needs
+    the explicit ``unattended_submit`` switch, because a policy file that
+    says ``"level": "full"`` must not by itself send a real application
+    with no prompt.
+    """
     from indeed_scraper.apply.flow import apply_to_jobs
 
     console = _FakeConsole("yes")
@@ -98,11 +104,38 @@ def test_the_flow_does_not_prompt_when_the_policy_allows_it(tmp_path: Path) -> N
         profile=_profile_with_resume(tmp_path),
         limit=1,
         confirm=True,
-        policy=AutonomyPolicy(level="auto", max_applications_per_day=5, min_delay_minutes=0),
+        policy=AutonomyPolicy(
+            level="auto",
+            max_applications_per_day=5,
+            min_delay_minutes=0,
+            unattended_submit=True,
+        ),
         page=_page(),
     )
     assert not console.prompts, "auto mode must not ask the operator"
-    assert any(result.status == "submitted" for result in results)
+    # The submission went out without a prompt. It is recorded as
+    # "unconfirmed" because the fake page shows no confirmation signal, and
+    # an unconfirmed submit is still an ATTEMPT - which is what the
+    # idempotency guard cares about.
+    assert any(result.status in {"submitted", "unconfirmed"} for result in results)
+
+
+def test_the_flow_prompts_without_the_unattended_switch(tmp_path: Path) -> None:
+    """The level alone is not enough: the operator is still asked."""
+    from indeed_scraper.apply.flow import apply_to_jobs
+
+    console = _FakeConsole("yes")
+    apply_to_jobs(
+        _config(tmp_path),
+        _FakeStore(),
+        console,
+        profile=_profile_with_resume(tmp_path),
+        limit=1,
+        confirm=True,
+        policy=AutonomyPolicy(level="auto", max_applications_per_day=5, min_delay_minutes=0),
+        page=_page(),
+    )
+    assert console.prompts, "auto without the switch must still ask the operator"
 
 
 def test_the_policy_supplies_the_risk_budget(tmp_path: Path) -> None:
@@ -110,7 +143,12 @@ def test_the_policy_supplies_the_risk_budget(tmp_path: Path) -> None:
     from indeed_scraper.apply.flow import apply_to_jobs
 
     console = _FakeConsole("yes")
-    policy = AutonomyPolicy(level="auto", max_applications_per_day=1, min_delay_minutes=0)
+    policy = AutonomyPolicy(
+        level="auto",
+        max_applications_per_day=1,
+        min_delay_minutes=0,
+        unattended_submit=True,
+    )
     config = _config(tmp_path)
     apply_to_jobs(
         config,

@@ -128,7 +128,7 @@ def _fill_and_submit(
 
     draft: dict[str, Any] = {}
     try:
-        draft = indeed_form.fill_indeed_form(page, profile, draft)
+        draft = indeed_form.fill_indeed_form(page, profile)
     except FieldMissingError as error:
         ledger.mark(fingerprint, "blocked", f"missing:{error.question}")
         console.print(f"[yellow]{job.title[:40]} - missing: {error.question}[/yellow]")
@@ -177,11 +177,14 @@ def _fill_and_submit(
     # shows the attempt, so the posting is never applied to a second time.
     ledger.mark(fingerprint, "submitting", "")
 
-    submitted = indeed_form.submit_application(page)
-    if not submitted:
-        ledger.mark(fingerprint, "failed", "submit_not_confirmed")
-        return _result(job, fingerprint, "failed", portal, "submit_not_confirmed")
-
-    ledger.mark(fingerprint, "submitted", "")
-    console.print(f"[green]submitted[/green] {job.title[:40]} ({job.company})")
-    return _result(job, fingerprint, "submitted", portal, "")
+    result = indeed_form.submit_application(page)
+    if result.confirmed:
+        ledger.mark(fingerprint, "submitted", "")
+        console.print(f"[green]submitted[/green] {job.title[:40]} ({job.company})")
+        return _result(job, fingerprint, "submitted", portal, "")
+    elif result.clicked:
+        ledger.mark(fingerprint, "unconfirmed", "submit_unconfirmed")
+        return _result(job, fingerprint, "unconfirmed", portal, "submit_unconfirmed")
+    else:
+        ledger.mark(fingerprint, "failed", "submit_not_found")
+        return _result(job, fingerprint, "failed", portal, "submit_not_found")
