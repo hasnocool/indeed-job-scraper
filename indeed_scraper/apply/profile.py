@@ -82,8 +82,7 @@ def load_profile(path: Path | None = None) -> Profile:
     Raises ProfileNotFoundError if the file does not exist.
     Raises on invalid JSON.
     """
-    p = path or PROFILE_PATH
-    expanded = p if p.is_absolute() else Path(os.environ.get("INDEED_PROFILE_PATH", "~/.config/indeed_scraper/profile.json")).expanduser()
+    expanded = resolve_profile_path(path)
     if not expanded.exists():
         raise ProfileNotFoundError(
             f"Profile not found at {expanded}. "
@@ -112,8 +111,7 @@ def save_profile(profile: Profile, path: Path | None = None) -> Path:
     Creates the parent directory if it does not exist.
     Returns the path written to.
     """
-    p = path or PROFILE_PATH
-    expanded = p if p.is_absolute() else Path(os.environ.get("INDEED_PROFILE_PATH", "~/.config/indeed_scraper/profile.json")).expanduser()
+    expanded = resolve_profile_path(path)
     expanded.parent.mkdir(parents=True, exist_ok=True)
     expanded.parent.chmod(0o700)
     tmp = expanded.with_suffix(".tmp")
@@ -141,3 +139,29 @@ def apply_data(profile: Profile) -> ApplyData:
         cover_letter=profile.cover_letter,
         screening_answers=profile.screening_answers,
     )
+
+
+def resolve_profile_path(path: Path | None = None) -> Path:
+    """Resolve the profile path the operator asked for.
+
+    Three cases, and they used to be conflated:
+
+    * no path -> the default profile;
+    * an ABSOLUTE path -> that file;
+    * a RELATIVE path -> that file, resolved against the CURRENT
+      DIRECTORY.
+
+    The old code treated a relative path as "no path given" and loaded the
+    DEFAULT profile instead. The operator asked for a specific file and
+    silently got a different one - a different operator's details, or the
+    wrong resume.
+    """
+    if path is None:
+        return Path(
+            os.environ.get(
+                "INDEED_PROFILE_PATH", "~/.config/indeed_scraper/profile.json"
+            )
+        ).expanduser()
+    if path.is_absolute():
+        return path
+    return Path.cwd() / path

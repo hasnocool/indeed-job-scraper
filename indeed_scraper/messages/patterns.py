@@ -36,9 +36,15 @@ from __future__ import annotations
 import re
 
 #: Phrases that indicate an offer or another binding commitment.
+#:
+#: A suffix alternation must name the SUFFIX ALONE, never glue itself to
+#: the stem: ``\bhire(?:ing|d|s)?\b`` matches "hire", "hired" and "hires"
+#: but not "hiring" (which would need "hireing"), so "We are hiring you"
+#: slipped through and was answered UNATTENDED. The form used here,
+#: ``\bhir(?:e|ing|ed|es)\b``, matches all four.
 OFFER_PATTERNS = (
     r"\boffer(?:s|ed|ing)?\b",
-    r"\bhire(?:ing|d|s)?\b",
+    r"\bhir(?:e|ing|ed|es)\b",
     r"\baccept(?:ance)? (?:of|the|our|this|an|it)\b",
     r"\baccept(?:ance)? of\b",
     r"\bjoining us\b",
@@ -128,6 +134,12 @@ BINDING_PATTERNS = (
     r"\bjoining date\b",
     r"\bon board\b",
     r"\boffer(?:s|ed|ing)?\b",
+    # "We are hiring you" is a binding commitment too. The BINDING list is
+    # the SECOND, independent detector - it decides whether a HUMAN must
+    # look first, whatever the message is classified as - so it needs the
+    # same vocabulary as the offer list. The suffix group names the
+    # SUFFIX ALONE: "\bhire(?:ing|d|s)?\b" would miss "hiring".
+    r"\bhir(?:e|ing|ed|es)\b",
     r"\baccept(?:ance)? (?:of|the|our|this|an|it)\b",
     r"\baccept(?:ance)? of\b",
     r"\byou will be (?:joining|starting|on)\b",

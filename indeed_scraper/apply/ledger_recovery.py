@@ -29,6 +29,9 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
+from .budget_day import same_budget_day
+from .statuses import SUBMITTED_LIKE_STATUSES as BUDGET_CONSUMING_STATUSES
+
 #: The status a torn reservation is treated as. "reserved" is live (it blocks
 #: the posting) and carries the lease, so a genuinely abandoned run still
 #: becomes retryable.
@@ -168,3 +171,66 @@ def reservation_age(
     if when.tzinfo is None:
         when = when.replace(tzinfo=timezone.utc)
     return (now - when).total_seconds()
+
+
+def _parse_stamp(entry: dict[str, Any]) -> datetime | None:
+    """The entry's timestamp, as an aware UTC datetime, or None."""
+    stamp = entry.get("applied_at")
+    if not isinstance(stamp, str):
+        return None
+    try:
+        when = datetime.fromisoformat(stamp)
+    except ValueError:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return when
+
+
+def count_budget_consuming(entries: list[dict[str, Any]], moment: datetime) -> int:
+    """Count the applications that consumed a slot of the daily budget.
+
+    Each fingerprint counts ONCE, using its LATEST status, so a posting
+    marked more than once cannot inflate the count and wrongly block the
+    operator's budget.
+
+    The counted statuses are the BUDGET-CONSUMING ones: a confirmed
+    submission, and an unconfirmed attempt whose click may already have
+    reached the employer. The operator cannot un-send the latter, so the
+    budget has to assume it was spent.
+    """
+    latest = latest_by_fingerprint(entries)
+    count = 0
+    for entry in latest.values():
+        if entry.get("status") not in BUDGET_CONSUMING_STATUSES:
+            continue
+        when = _parse_stamp(entry)
+        if when is None:
+            continue
+        if same_budget_day(when, moment):
+            count += 1
+    return count
+
+
+def latest_budget_consuming_at(entries: list[dict[str, Any]]) -> datetime | None:
+    """When the most recent application that may have gone out happened.
+
+    Used to pace the NEXT application. The pacing has to hold across
+    runs, and the ledger is the only thing that outlives a process.
+
+    Both submitted-like statuses count: a confirmed submission and an
+    unconfirmed attempt. An unconfirmed click may already have reached
+    the employer, so pacing only after a confirmed one would let exactly
+    the attempts that slipped through go out un-paced.
+    """
+    latest = latest_by_fingerprint(entries)
+    newest: datetime | None = None
+    for entry in latest.values():
+        if entry.get("status") not in BUDGET_CONSUMING_STATUSES:
+            continue
+        when = _parse_stamp(entry)
+        if when is None:
+            continue
+        if newest is None or when > newest:
+            newest = when
+    return newest

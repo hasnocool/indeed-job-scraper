@@ -424,10 +424,25 @@ def _register_apply_commands() -> None:
 
     Their bodies live in :mod:`indeed_scraper.commands.apply_cmds` so this
     module stays a thin wiring layer.
+
+    The config factory is passed as a LAZY LOOKUP, not as the function
+    object. The commands are registered at import time, so passing
+    ``_config`` itself froze the ORIGINAL function into their closures: a
+    test's ``monkeypatch.setattr(cli, "_config", ...)`` replaced the
+    module attribute, but the already-registered command kept calling the
+    function it had captured - so it used the real config and wrote into
+    the operator's real ``data/`` directory.
+
+    Resolving ``cli._config`` at CALL time makes the patch reach the
+    command that is actually registered.
     """
     from .commands.apply_cmds import register
 
-    register(app, console, _config)
+    def _late_bound_config(**kwargs):
+        """The CLI's current ``_config``, resolved when the command runs."""
+        return _config(**kwargs)
+
+    register(app, console, _late_bound_config)
 
 
 _register_apply_commands()
@@ -501,7 +516,9 @@ def messages(
         False, "--dry-run", help="Draft the replies but send nothing."
     ),
     autonomy: str = typer.Option(
-        None, "--autonomy", help="manual | auto | full. Overrides the policy file for this run."
+        None,
+        "--autonomy",
+        help="manual | auto | full. Lowers the policy file's level for this run; never raises it.",
     ),
     profile_path: Path = typer.Option(  # noqa: B008 - typer's option pattern
         None, "--profile", help="Profile file (default ~/.config/indeed_scraper/profile.json)."

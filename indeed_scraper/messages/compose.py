@@ -144,10 +144,25 @@ def _answer_for(profile: Profile, question: str) -> str | None:
         phrase = key.strip().lower()
         if not phrase:
             continue
-        pattern = re.compile(r"\b" + re.escape(phrase) + r"\b")
-        if pattern.search(lowered):
+        if screening_pattern(phrase).search(lowered):
             return answer
     return None
+
+
+def screening_pattern(phrase: str) -> re.Pattern[str]:
+    """The pattern that matches a configured screening-answer key.
+
+    The key is matched with LOOKAROUND, not with ``\b``. ``\b`` is a
+    boundary between a word character and a non-word one, so ``\b`` after
+    a non-word character demands a word character and can never be
+    satisfied: the key "c++" could never match "Do you know C++?", and
+    the operator's configured answer silently never applied.
+
+    The lookaround asks the right question - is there a word character on
+    either side of the key? - and it works for every key, whether it ends
+    in a word character or not.
+    """
+    return re.compile(r"(?<!\w)" + re.escape(phrase) + r"(?!\w)")
 
 
 _CORPORATE_SUFFIXES = ("inc", "ltd", "llc", "corp", "co", "gmbh", "plc", "sa", "systems", "services")

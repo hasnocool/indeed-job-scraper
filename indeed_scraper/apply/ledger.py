@@ -24,9 +24,10 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .budget_day import same_budget_day
 from .ledger_recovery import (
+    count_budget_consuming,
     is_truncated_tail,
+    latest_budget_consuming_at,
     latest_by_fingerprint,
     latest_status,
     metadata_for,
@@ -35,6 +36,7 @@ from .ledger_recovery import (
     reservation_age,
 )
 from .status import normalise_text, strip_location_suffix
+from .statuses import SUBMITTED_LIKE_STATUSES
 
 LOCK_SUFFIX = ".lock"
 FILE_MODE = 0o600
@@ -148,11 +150,17 @@ class ApplicationLedger:
     LIVE_STATUSES = frozenset({"reserved", "submitting", "submitted", "unconfirmed"})
 
     #: The statuses that CONSUME a slot of the operator's daily apply budget.
+    #:
     #: "submitted" is obvious. "unconfirmed" is an attempt whose click went
     #: out but whose confirmation could not be read: it may already have
     #: reached the employer, and the operator cannot un-send it, so the
     #: budget has to assume it was spent.
-    BUDGET_CONSUMING_STATUSES = frozenset({"submitted", "unconfirmed"})
+    #:
+    #: This is the SAME set as the shared vocabulary's
+    #: ``SUBMITTED_LIKE_STATUSES``: "may have reached the employer" and
+    #: "consumes the budget" are the same question asked in two places, and
+    #: two copies of one answer are two answers that can drift apart.
+    BUDGET_CONSUMING_STATUSES = SUBMITTED_LIKE_STATUSES
 
     def _is_live_unlocked(self, fingerprint: str) -> bool:
         """True when the posting is reserved, being submitted, or submitted.
@@ -337,22 +345,26 @@ class ApplicationLedger:
         """
         self._reparse()
         moment = now or datetime.now(timezone.utc)
+        return count_budget_consuming(self._entries, moment)
 
-        latest = latest_by_fingerprint(self._entries)
+    def last_submit_time(self) -> datetime | None:
+        """When the most recent application may have gone out, or None.
 
-        count = 0
-        for entry in latest.values():
-            if entry.get("status") not in ApplicationLedger.BUDGET_CONSUMING_STATUSES:
-                continue
-            stamp = entry.get("applied_at")
-            if not isinstance(stamp, str):
-                continue
-            try:
-                when = datetime.fromisoformat(stamp)
-            except ValueError:
-                continue
-            if when.tzinfo is None:
-                when = when.replace(tzinfo=timezone.utc)
-            if same_budget_day(when, moment):
-                count += 1
-        return count
+        The pacing rule ("at least N minutes between two applications")
+        has to hold ACROSS RUNS, not just within one. Before this method
+        existed the flow kept its ``last_submit`` in a local variable that
+        started as ``None`` in every invocation, so two back-to-back runs
+        submitted with ZERO spacing between them - and the 30-minute
+        minimum delay is the entire point of the risk budget.
+
+        The ledger is the only place that survives the end of a process,
+        so it is the only place that can answer "when did the last
+        application go out?".
+
+        Both submitted-like statuses count: a CONFIRMED submission and an
+        UNCONFIRMED one. The unconfirmed click may already have reached
+        the employer, so pacing only after a confirmed submission would
+        let exactly the attempts that slipped through go out un-paced.
+        """
+        self._reparse()
+        return latest_budget_consuming_at(self._entries)

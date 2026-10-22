@@ -16,6 +16,10 @@ ApplyStatus = Literal[
     "blocked",
     "failed",
     "dry_run",
+    #: A posting the run deliberately left alone - it had already been
+    #: applied to, or it was reserved. It is NOT a failure: the run did
+    #: exactly what it was asked to do.
+    "skipped",
 ]
 PortalType = Literal["indeed", "external", "unknown"]
 

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from indeed_scraper.apply.drafts import app_id_for
 from indeed_scraper.apply.status import RESPONSE_STATUSES, response_status_for
+from indeed_scraper.apply.statuses import is_submitted_like
 
 from .store import write_response
 
@@ -17,6 +18,21 @@ __all__ = [
     "collect_responses",
     "parse_status",
 ]
+
+#: The status the monitor reports for an application whose submit click was
+#: dispatched but whose confirmation could not be read.
+#:
+#: It is deliberately NOT one of the employer-facing statuses
+#: ("applied", "viewed", "interview", ...): those describe what the EMPLOYER
+#: did, and here we do not know that the employer did anything. The name
+#: says exactly what we know - the application went out, the outcome is
+#: unknown - so the operator can act on it (check Indeed) without the
+#: record making a claim we cannot support.
+UNCONFIRMED_STATUS = "unconfirmed"
+
+#: The status the monitor reports for a CONFIRMED application. It is a
+#: distinct name from "unconfirmed" for the same reason.
+CONFIRMED_STATUS = "applied"
 
 
 def _now_iso() -> str:
@@ -51,8 +67,14 @@ def collect_responses(
     *,
     fetch_status=None,
 ) -> list[dict]:
-    """Read the ledger, keep only entries whose latest status is "submitted",
+    """Read the ledger, keep the entries whose application may have gone out,
     derive app_id, and for each produce a response record.
+
+    The kept statuses are the SUBMITTED-LIKE ones: ``submitted`` (the
+    employer confirmed it) and ``unconfirmed`` (the click went out, the
+    confirmation could not be read). An ``unconfirmed`` application may
+    already have reached a real employer, so hiding it from the operator's
+    own status report would hide an application they may have to chase.
 
     *fetch_status* is an optional callable (jk: str) -> str | None used to
     obtain the live status text for a job; when it is None, the status is
@@ -103,10 +125,12 @@ def collect_responses(
         else:
             latest[fingerprint] = entry
 
-    # Now process only entries whose latest status is "submitted"
+    # Now process the entries whose application may have reached the
+    # employer. The vocabulary lives in apply/statuses.py so this filter
+    # cannot drift away from the ledger's own definition of the same idea.
     for fingerprint, entry in latest.items():
-        status = entry.get("status", "")
-        if status != "submitted":
+        status = str(entry.get("status", ""))
+        if not is_submitted_like(status):
             continue
 
         app_id = app_id_for(fingerprint)
@@ -123,8 +147,14 @@ def collect_responses(
         # Determine the response status from live text
         if live_text is not None and live_text.strip():
             response_status = parse_status(live_text)
+        elif status == "unconfirmed":
+            # No live status was read. The application may have gone out,
+            # but nothing confirms that the employer received it, so the
+            # record says exactly that - it does not claim the employer
+            # applied, viewed or interviewed.
+            response_status = UNCONFIRMED_STATUS
         else:
-            response_status = "unknown"
+            response_status = CONFIRMED_STATUS
 
         checked_at = _now_iso()
 
@@ -136,6 +166,10 @@ def collect_responses(
             "title": title,
             "checked_at": checked_at,
             "status": response_status,
+            # The ledger status is kept beside the reported one, so the
+            # operator (and any tooling reading the record) can always see
+            # whether this application's submission was confirmed.
+            "ledger_status": status,
             "source": "indeed",
         }
 

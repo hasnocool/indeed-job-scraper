@@ -81,9 +81,18 @@ def register_resume_commands(
 
         Reads the application ledger and records the current status for each
         submission. No polling, no scheduler: this is a manual command.
+
+        The command opens Indeed's application tracker and reads the REAL
+        status of each application. It used to call the monitor with no
+        status fetcher at all, so every record came out as "unknown" and
+        the command reported the status of nothing.
         """
         config = config_factory()
-        records = collect_responses(ledger_path(config), responses_dir(config))
+        records = collect_responses(
+            ledger_path(config),
+            responses_dir(config),
+            fetch_status=_status_fetcher(config, console),
+        )
         if not records:
             console.print("[yellow]No submitted applications to check.[/yellow]")
             return
@@ -100,3 +109,48 @@ def register_resume_commands(
                 str(record.get("checked_at", ""))[:19],
             )
         console.print(table)
+
+
+def _status_fetcher(config: Any, console: Console) -> Any:
+    """A callable that reads Indeed's live status for a job.
+
+    The tracker is opened ONCE, and the rows are read once; the returned
+    callable answers from those rows. Re-reading the tracker for every
+    application would be slow and a good way to get rate-limited.
+
+    When the browser cannot be opened - no session, no driver, a challenge
+    - the fetcher answers "" instead of raising. The command then reports
+    the applications it knows about with an unknown live status, which is
+    strictly better than the command refusing to run at all.
+    """
+    from ..apply.tracker import open_tracker, status_fetcher_for
+    from ..cookies import CookieStore
+
+    store = CookieStore(config)
+    session = store.current()
+    if session is None or not session.is_signed_in():
+        console.print(
+            "[yellow]No signed-in Indeed session - reporting the ledger statuses only.[/yellow]"
+        )
+        return lambda jk: ""
+
+    try:
+        page = _open_tracker_page(config, session)
+        open_tracker(page)
+        return status_fetcher_for(page)
+    except Exception as error:  # noqa: BLE001 - the tracker is optional
+        console.print(f"[yellow]Could not read the tracker: {error}[/yellow]")
+        return lambda jk: ""
+
+
+def _open_tracker_page(config: Any, session: Any) -> Any:
+    """Open a browser tab on the application tracker.
+
+    Kept as its own function so a test can supply a page without a
+    browser. The driver opens the tab and the CALLER closes it.
+    """
+    from ..apply.driver import open_driver
+
+    context_manager = open_driver(config, session)
+    context, _info = context_manager.__enter__()
+    return context.pages[0] if context.pages else context.new_page()

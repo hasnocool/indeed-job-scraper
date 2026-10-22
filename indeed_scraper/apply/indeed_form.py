@@ -122,13 +122,16 @@ def fill_indeed_form(page: Page, profile: Profile) -> dict:
     Returns:
         The draft map of the fields that were really filled.
     """
-    from_path = profile.resume_path
+    # The path is expanded ONCE, here, and the expanded path is what is
+    # validated and what is handed to the file input. Expanding it in two
+    # places is how the tilde reached the browser in the first place.
+    resume_path = Path(profile.resume_path).expanduser()
     job_url = page.url
 
     # The resume is the one file that is UPLOADED to an employer, so this is
     # where it must be a real document: a placeholder would be sent to them.
     try:
-        validate_resume(Path(from_path).expanduser())
+        validate_resume(resume_path)
     except ProfileNotFoundError as error:
         raise FieldMissingError(f"resume: {error}", page.url) from error
 
@@ -157,19 +160,31 @@ def fill_indeed_form(page: Page, profile: Profile) -> dict:
         filled[field_name] = value
 
     # The resume is recorded ONLY when a file input really took the file.
-    # A form with no file input at all is recorded as "no_input", so the
-    # operator can see that the resume never reached the employer instead
-    # of reading a draft that says the resume was sent.
+    #
+    # The path is EXPANDED first: the browser does not understand a tilde,
+    # so "~/Documents/resume.pdf" reached the file input as that literal
+    # string, the upload failed silently, and the application went out with
+    # no resume.
+    #
+    # A REFUSED upload is a HARD BLOCK, not a warning. The resume is the one
+    # file that is uploaded to an employer, and an employer who receives an
+    # application with no resume has received a broken one. The two cases
+    # are told apart on purpose: "the form has no file input" is a
+    # legitimate outcome and keeps its honest label, while "the upload was
+    # refused" is a failure and stops the run.
     resume_locator, _resume_selector = find_fillable(page, FIELD_SELECTORS["resume"])
-    if resume_locator is not None:
-        try:
-            resume_locator.set_input_files(from_path)
-        except Exception:  # noqa: BLE001 - the upload may have been refused
-            resume_locator = None
-    if resume_locator is not None:
-        filled["resume"] = True
-    else:
+    if resume_locator is None:
         filled["resume_status"] = "no_input"
+    else:
+        try:
+            resume_locator.set_input_files(str(resume_path))
+        except Exception as error:  # the upload was refused
+            raise FieldMissingError(
+                f"resume: the upload was refused ({type(error).__name__}); "
+                "the application was NOT sent",
+                job_url,
+            ) from error
+        filled["resume"] = True
 
     if profile.cover_letter:
         cover_locator, _cover_selector = find_fillable(page, FIELD_SELECTORS["cover_letter"])

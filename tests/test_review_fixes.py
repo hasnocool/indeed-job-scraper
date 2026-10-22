@@ -203,7 +203,11 @@ def test_the_flow_skips_a_submitting_posting(tmp_path: Path) -> None:
         needs_confirm=True,
         dry_run=False,
     )
-    assert [r.status for r in results] == ["failed"]
+    # The posting is SKIPPED, not failed: the run did what it was asked -
+    # it left a posting it had already reached alone. Reporting that as a
+    # failure made the exit code say "an attempt failed" for a run that
+    # did exactly the right thing.
+    assert [r.status for r in results] == ["skipped"]
     assert results[0].detail == "duplicate"
     assert (
         ledger.status_of(fingerprint) == "submitting"

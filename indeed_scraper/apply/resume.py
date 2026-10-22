@@ -166,6 +166,21 @@ def resume_application(
             if challenge:
                 ledger.mark(fingerprint, "blocked", f"challenge:{challenge}")
                 raise ApplyBlockedError(challenge, url)
+            # The same portal guard the apply path applies. The selectors
+            # in this module were written for Indeed's own form, so
+            # resuming into an external ATS would fill the wrong fields
+            # and submit them.
+            #
+            # An external destination is a PER-POSTING block, exactly as
+            # it is on the apply path: the posting is marked blocked and
+            # the run carries on. Only a challenge stops the whole run.
+            reason = _portal_reason(page)
+            if reason:
+                ledger.mark(fingerprint, "blocked", reason)
+                console.print(
+                    f"[yellow]resume {app_id} blocked - {reason}[/yellow]"
+                )
+                return None
             try:
                 filled = indeed_form.fill_indeed_form(page, profile)
             except FieldMissingError as error:
@@ -245,3 +260,21 @@ def resume_application(
             # never left open in the shared browser.
             if owns_page:
                 page.close()
+
+
+def _portal_reason(page: Any) -> str:
+    """Why this destination cannot be resumed into, or "" when it can.
+
+    The apply path calls ``detect_portal`` and refuses an external ATS
+    ("external") or an unrecognised page ("unknown"). The resume path did
+    not, so it would fill and submit on a greenhouse page - a site whose
+    form these selectors were never written against.
+
+    Returns:
+        "" when the destination is an Indeed form, otherwise the reason
+        the posting is blocked (the same words the apply path uses).
+    """
+    portal = indeed_form.detect_portal(page)
+    if portal == "indeed":
+        return ""
+    return "external_portal_deferred" if portal == "external" else "unknown_portal"

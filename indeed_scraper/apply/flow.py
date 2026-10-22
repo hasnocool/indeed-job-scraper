@@ -42,6 +42,17 @@ from .workspace import (
 #: A reservation older than this is treated as abandoned (the run was killed).
 RESERVATION_LEASE_SECONDS = 2 * 60 * 60
 
+#: Why a posting was skipped. "already applied or reserved" covers both
+#: cases truthfully: a posting that was applied to, and a posting that is
+#: merely HELD. The old wording said "already applied" for a posting that
+#: had never been applied to, which was simply untrue.
+_SKIP_REASON = "already applied or reserved"
+
+
+def _skip_message() -> str:
+    """The message shown when a posting is skipped."""
+    return _SKIP_REASON
+
 
 def _stale(ledger: ApplicationLedger, fingerprint: str) -> bool:
     """True when a reservation is older than the lease and may be retried."""
@@ -78,7 +89,12 @@ def _apply_jobs_on_page(
 ) -> list[ApplyResult]:
     """Run the guarded per-posting loop against an open page."""
     results: list[ApplyResult] = []
-    last_submit: datetime | None = None
+    # The pacing has to hold ACROSS RUNS, so the clock is seeded from the
+    # LEDGER - the only thing that outlives a process. It used to start as
+    # None in every invocation, so two back-to-back runs submitted with
+    # zero spacing between them, and the 30-minute minimum delay was a
+    # rule that only held inside a single run.
+    last_submit: datetime | None = ledger.last_submit_time()
     for job in jobs:
         fingerprint = job_fingerprint(job)
         status = ledger.status_of(fingerprint)
@@ -86,12 +102,12 @@ def _apply_jobs_on_page(
             # "submitting" means a previous run reached the submit click and
             # may have gone out. It is NEVER re-applied: a duplicate
             # application is worse than a missed one.
-            console.print(f"[dim]skip {job.title[:40]} - already applied[/dim]")
-            results.append(_result(job, fingerprint, "failed", "unknown", "duplicate"))
+            console.print(f"[dim]skip {job.title[:40]} - {_SKIP_REASON}[/dim]")
+            results.append(_result(job, fingerprint, "skipped", "unknown", "duplicate"))
             continue
         if status == "reserved" and not _stale(ledger, fingerprint):
-            console.print(f"[dim]skip {job.title[:40]} - already applied[/dim]")
-            results.append(_result(job, fingerprint, "failed", "unknown", "duplicate"))
+            console.print(f"[dim]skip {job.title[:40]} - {_SKIP_REASON}[/dim]")
+            results.append(_result(job, fingerprint, "skipped", "unknown", "duplicate"))
             continue
         if status == "reserved":
             # A previous run was killed BEFORE the submit click: release the
@@ -120,13 +136,22 @@ def _apply_jobs_on_page(
             )
         except ApplyBlockedError as error:
             console.print(f"[red]blocked: {error}[/red]")
-            results.append(_result(job, fingerprint, "blocked", "unknown", str(error)))
+            # The detail carries the SAME "challenge:<kind>" marker the
+            # ledger uses, because ``exit_code_for`` reads that marker to
+            # tell "a wall stopped this run" (exit 3) from "an attempt
+            # failed" (exit 2). The two spellings must not drift apart.
+            results.append(
+                _result(job, fingerprint, "blocked", "unknown", f"challenge:{error}")
+            )
             if budget.stop_on_captcha:
                 console.print("[red]challenge detected - stopping this run.[/red]")
                 break
             continue
         results.append(result)
-        if result.status == "submitted":
+        if result.status in {"submitted", "unconfirmed"}:
+            # Both pace the next one: an unconfirmed click may already have
+            # reached the employer, so it is exactly the kind of attempt
+            # that must not be followed immediately by another.
             last_submit = datetime.now(tz=timezone.utc)
     return results
 

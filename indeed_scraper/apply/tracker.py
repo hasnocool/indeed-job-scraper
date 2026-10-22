@@ -62,7 +62,16 @@ _JS_ENTRIES = r"""() => {
       if (card.querySelector('a[href*="viewjob"], a[aria-label*="job description"]')) break;
     }
     const lines = (card.innerText || '').split('\n').map(s => s.trim()).filter(Boolean);
-    out.push({ lines: lines.slice(0, 10) });
+    // The JOB KEY is what links a tracker card back to our ledger entry.
+    // It lives in the card's link ("?jk=abc123"), and without it the
+    // response monitor cannot tell which application a status belongs to.
+    const link = card.querySelector('a[href*="jk="]');
+    let jk = '';
+    if (link) {
+      const match = (link.getAttribute('href') || '').match(/[?&]jk=([A-Za-z0-9]+)/);
+      if (match) jk = match[1];
+    }
+    out.push({ lines: lines.slice(0, 10), jk: jk });
   }
   return out;
 }"""
@@ -78,6 +87,10 @@ class TrackerEntry:
     status: str
     status_text: str
     applied_on: str
+    #: The job key, when the card carried one. It is what links a tracker
+    #: row back to our ledger entry, so the response monitor can tell
+    #: which application a status belongs to.
+    jk: str = ""
 
 
 def _is_boilerplate(line: str) -> bool:
@@ -128,6 +141,7 @@ def read_tracker(page: Any) -> list[TrackerEntry]:
     entries: list[TrackerEntry] = []
     for record in raw or []:
         lines = [str(line) for line in record.get("lines", [])]
+        jk = str(record.get("jk", ""))
         # Indeed renders each card as: status, title, company, location, date.
         lines = [
             line
@@ -169,6 +183,7 @@ def read_tracker(page: Any) -> list[TrackerEntry]:
                 status=classify_status(status_text),
                 status_text=status_text,
                 applied_on=applied_on,
+                jk=jk,
             )
         )
     return entries
@@ -177,6 +192,39 @@ def read_tracker(page: Any) -> list[TrackerEntry]:
 def action_required(entry: TrackerEntry) -> bool:
     """True when the operator must act on this application."""
     return entry.status in ACTION_REQUIRED
+
+
+def status_fetcher_for(page: Any) -> Any:
+    """Build the callable the response monitor uses to read a live status.
+
+    The monitor takes a ``fetch_status(jk) -> str | None`` callable. This
+    is the implementation: it reads the application tracker ONCE, and
+    answers from the rows it read.
+
+    Reading the tracker once per check - rather than once per application -
+    matters: the tracker is a single page, and re-reading it for every
+    application would be both slow and a good way to get rate-limited.
+
+    A job that is not on the tracker answers "" rather than raising: the
+    command checks every application, and one that Indeed does not list is
+    normal, not an error.
+
+    Returns:
+        A callable taking a job key and returning the employer's status
+        text, or "" when the job is not on the tracker.
+    """
+    entries = read_tracker(page)
+    by_jk: dict[str, str] = {}
+    for entry in entries:
+        status_text = entry.status_text or entry.status
+        if status_text and entry.jk:
+            by_jk[entry.jk] = status_text
+
+    def fetch_status(jk: str) -> str:
+        """The employer's status text for a job, or "" when unknown."""
+        return by_jk.get(jk, "")
+
+    return fetch_status
 
 
 def available_statuses(page: Any) -> list[str]:
